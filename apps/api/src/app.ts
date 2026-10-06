@@ -38,6 +38,8 @@ export type AppDeps = {
   llm?: Llm;
   /** web-push sender override (tests). */
   push?: PushSender;
+  /** Temporal worker health for /health; "disabled" when Temporal isn't running. */
+  temporalHealth?: () => Promise<string>;
 };
 
 export const SESSION_COOKIE = "sitspot_session";
@@ -127,7 +129,7 @@ export function createApp(deps: AppDeps) {
       ok: dbUp,
       db: dbUp ? "up" : "down",
       llm: env.LLM_BASE_URL && env.LLM_MODEL_CHAT ? "configured" : "missing",
-      temporal: "unknown",
+      temporal: deps.temporalHealth ? await deps.temporalHealth().catch(() => "down") : "disabled",
     });
   });
 

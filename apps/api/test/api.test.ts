@@ -63,7 +63,7 @@ const cron = { "x-cron-secret": "cron-s3cret" };
 describe("health + auth", () => {
   it("health reports db up", async () => {
     const { json } = await req("/health");
-    expect(json).toEqual({ ok: true, db: "up", llm: "missing", temporal: "unknown" });
+    expect(json).toEqual({ ok: true, db: "up", llm: "missing", temporal: "disabled" });
   });
 
   it("bad passcode 401, good passcode sets httpOnly cookie, /v1/me works, logout clears", async () => {
