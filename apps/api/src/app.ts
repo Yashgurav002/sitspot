@@ -14,6 +14,7 @@ import {
 import { safeEqual, sign, verify } from "./auth";
 import { evaluateForUser } from "./services/evaluate";
 import { pullAll } from "./services/pull";
+import { mcpHandler } from "./mcp";
 
 export type Signals = {
   responded?(invitationId: string, accepted: boolean): unknown;
@@ -391,6 +392,9 @@ export function createApp(deps: AppDeps) {
   });
 
   app.get("/v1/push/vapid-public-key", (c) => c.json({ key: env.VAPID_PUBLIC_KEY || null }));
+
+  // ---------- mcp (read-only) ----------
+  app.all("/mcp", mcpHandler({ db, env, now, secret, sessionCookie: SESSION_COOKIE, adminEmail: adminEmail(env), embed: deps.embed }));
 
   // ---------- cron ----------
   app.use("/cron/*", async (c, next) => {

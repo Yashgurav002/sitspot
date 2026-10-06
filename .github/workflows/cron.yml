@@ -1,0 +1,69 @@
+name: cron
+# GitHub cron: UTC, minimum 5-minute interval, runs can be late. Each `if:` must match its cron string exactly.
+on:
+  schedule:
+    - cron: "*/10 * * * *" # keep-alive (Render free tier sleeps after 15 min idle)
+    - cron: "5 * * * *" # hourly data pull
+    - cron: "15 * * * *" # hourly TabPFN forecast
+  workflow_dispatch: {}
+
+concurrency:
+  group: cron-${{ github.event.schedule || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    if: github.event.schedule == '*/10 * * * *'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API_URL: ${{ secrets.API_URL }}
+      WEB_URL: ${{ secrets.WEB_URL }}
+    steps:
+      - name: Ping API /health
+        run: |
+          if [ -z "$API_URL" ]; then echo "API_URL secret not set; skipping"; exit 0; fi
+          curl -fsS --retry 3 --retry-all-errors --max-time 120 "$API_URL/health"
+      - name: Ping web
+        run: |
+          if [ -z "$WEB_URL" ]; then echo "WEB_URL secret not set; skipping"; exit 0; fi
+          curl -fsS --retry 3 --retry-all-errors --max-time 120 -o /dev/null "$WEB_URL"
+
+  pull:
+    if: github.event.schedule == '5 * * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      API_URL: ${{ secrets.API_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+    steps:
+      - name: POST /cron/pull
+        run: |
+          if [ -z "$API_URL" ] || [ -z "$CRON_SECRET" ]; then echo "API_URL/CRON_SECRET not set; skipping"; exit 0; fi
+          curl -fsS --retry 3 --retry-all-errors --max-time 120 -X POST -H "X-Cron-Secret: $CRON_SECRET" "$API_URL/cron/pull"
+
+  forecast:
+    needs: [pull]
+    # workflow_dispatch runs pull then forecast; on the :15 schedule pull is skipped, so don't require success.
+    if: ${{ always() && (github.event.schedule == '15 * * * *' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - name: Check DATABASE_URL
+        id: gate
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret not set; skipping"; echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@v4
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: ml/tabpfn/requirements.txt
+      - if: steps.gate.outputs.run == 'true'
+        run: pip install -r ml/tabpfn/requirements.txt
+      - if: steps.gate.outputs.run == 'true'
+        run: python ml/tabpfn/forecast_job.py
