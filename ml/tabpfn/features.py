@@ -4,6 +4,8 @@
 
 Weather (Open-Meteo archive), US AQI (air-quality API) and tide (marine API) are fetched per
 0.1-degree grid cell and year, cached on disk. AQI/tide become null when the API has no history.
+Feed-only rows (export_ebird.py --feed-only) have no duration/protocol: those features are NaN and
+effort_known = 0. They are kept; the label is noisier for them (long checklists find more species).
 """
 from __future__ import annotations
 
@@ -19,11 +21,11 @@ import numpy as np
 import pandas as pd
 import requests
 
-from export_ebird import CACHE, cached_get
+from export_ebird import CACHE, HERE, cached_get
 
 FEATURES = ["hour", "day_of_year", "minutes_from_sunrise", "minutes_to_sunset", "is_golden_hour",
             "temp_c", "apparent_c", "rh_pct", "wind_ms", "precip_mm", "cloud_pct", "us_aqi",
-            "tide_m", "tide_trend", "dist_to_coast_km", "duration_min", "is_traveling"]
+            "tide_m", "tide_trend", "dist_to_coast_km", "duration_min", "is_traveling", "effort_known"]
 WX_VARS = {"temperature_2m": "temp_c", "apparent_temperature": "apparent_c",
            "relative_humidity_2m": "rh_pct", "wind_speed_10m": "wind_ms",
            "precipitation": "precip_mm", "cloud_cover": "cloud_pct"}
@@ -68,7 +70,9 @@ def hour_key(t: datetime) -> str:
 
 def feature_row(lat: float, lon: float, t: datetime, hourly: dict, duration_min: float,
                 is_traveling: int) -> dict:
-    """t is local (IST) naive time; hourly maps 'YYYY-MM-DDTHH:00' -> {temp_c, ..., us_aqi, tide_m}."""
+    """t is local (IST) naive time; hourly maps 'YYYY-MM-DDTHH:00' -> {temp_c, ..., us_aqi, tide_m}.
+    duration_min/is_traveling None or NaN = effort unknown (feed-only row)."""
+    known = duration_min is not None and not pd.isna(duration_min)
     near = (t + timedelta(minutes=30)).replace(minute=0, second=0, microsecond=0)
     wx = hourly.get(hour_key(near), {})
     rise, sset = sun_times(lat, lon, t.date())
@@ -82,7 +86,8 @@ def feature_row(lat: float, lon: float, t: datetime, hourly: dict, duration_min:
         **{k: wx.get(k) for k in [*WX_VARS.values(), "us_aqi", "tide_m"]},
         "tide_trend": None if before is None or after is None else float(np.sign(after - before)),
         "dist_to_coast_km": dist_to_coast_km(lat, lon),
-        "duration_min": duration_min, "is_traveling": is_traveling,
+        "duration_min": float(duration_min) if known else np.nan,
+        "is_traveling": is_traveling if known else np.nan, "effort_known": int(known),
     }
 
 
@@ -123,7 +128,7 @@ def build_features(df: pd.DataFrame, fetch=fetch_hourly) -> pd.DataFrame:
         hourly = fetch(clat, clon, g["_t"].min().date(), (g["_t"].max() + timedelta(hours=2)).date())
         for idx, r in g.iterrows():
             rows[idx] = feature_row(r.lat, r.lon, r["_t"].to_pydatetime(), hourly, r.duration_min,
-                                    int(r.protocol == "traveling"))
+                                    np.nan if pd.isna(r.protocol) else int(r.protocol == "traveling"))
     feats = pd.DataFrame.from_dict(rows, orient="index")[FEATURES]
     return pd.concat([df.drop(columns=[c for c in df if c.startswith("_")]), feats], axis=1)
 
@@ -134,10 +139,13 @@ def hour_band(hour):
 
 def label(df: pd.DataFrame) -> pd.DataFrame:
     """Filter protocols/duration, then rich = num_species >= hotspot median (>=10 checklists)
-    else >= regional median for the hour band."""
+    else >= regional median for the hour band. Rows with unknown effort (feed-only: duration and
+    protocol empty) are kept unfiltered - we cannot tell an incidental or 5-min list from a 2-h one."""
+    unknown = df["duration_min"].isna() & df["protocol"].isna()
     keep = df["protocol"].isin(["stationary", "traveling"]) & df["duration_min"].between(15, 120)
     if "all_obs_reported" in df:
         keep &= df["all_obs_reported"].astype(str).str.lower().isin(["true", "1"])
+    keep |= unknown
     df = df[keep].copy()
     hour = pd.to_datetime(df["obs_time"], utc=True).dt.tz_convert("Asia/Kolkata").dt.hour
     df["hour_band"] = hour_band(hour)
@@ -160,7 +168,8 @@ def to_db(df: pd.DataFrame, url: str):
                    values (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                    on conflict (checklist_id) do update set features = excluded.features,
                      num_species = excluded.num_species""",
-                (r.checklist_id, r.loc_id, r.lat, r.lon, r.obs_time, int(r.duration_min), r.protocol,
+                (r.checklist_id, r.loc_id, r.lat, r.lon, r.obs_time,
+                 None if pd.isna(r.duration_min) else int(r.duration_min), None if pd.isna(r.protocol) else r.protocol,
                  int(r.num_species), json.dumps(feats)))
 
 
@@ -174,7 +183,13 @@ def main(argv=None):
         sys.exit(f"{a.inp} not found - run export_ebird.py first (needs EBIRD_API_KEY).")
     df = build_features(label(pd.read_csv(a.inp)))
     df.to_csv(a.out, index=False)
-    print(f"wrote {len(df)} rows ({df['rich'].mean():.2f} rich) to {a.out}")
+    print(f"wrote {len(df)} rows ({df['rich'].mean():.2f} rich, {int(df['effort_known'].sum())} with effort) to {a.out}")
+    # Small copy for forecast_job (committable): features + label only, no ids, times or coordinates
+    # (personal eBird locations can be someone's home).
+    slim = HERE / "training.csv"
+    df[[*FEATURES, "rich"]].to_csv(slim, index=False, float_format="%.4g")
+    mb = slim.stat().st_size / 1e6
+    print(f"wrote {slim} ({mb:.2f} MB){'  - over 2 MB, keep it out of git' if mb > 2 else ''}")
     if a.to_db:
         if not os.environ.get("DATABASE_URL"):
             sys.exit("--to-db needs DATABASE_URL (Postgres).")

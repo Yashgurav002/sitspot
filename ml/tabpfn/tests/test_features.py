@@ -73,3 +73,14 @@ def test_build_features_uses_grid_and_fetcher():
     assert len(out) == 12 and (out["temp_c"] == 28.0).all()
     assert out.loc[out.loc_id == "A", "is_traveling"].eq(1).all()
     assert out["tide_m"].isna().all()
+
+
+def test_unknown_effort_rows_kept_with_nan_features():
+    feed = fixture_checklists().iloc[:3].assign(duration_min=float("nan"), protocol=None, all_obs_reported=None)
+    feed["checklist_id"] = ["F0", "F1", "F2"]
+    df = label(pd.concat([fixture_checklists(), feed], ignore_index=True)).set_index("checklist_id")
+    assert {"F0", "F1", "F2"} <= set(df.index) and not df.index.str.startswith("X").any()
+    out = build_features(df.reset_index(), fetch=lambda *a: {}).set_index("checklist_id")
+    assert out.loc[["F0", "F1", "F2"], ["duration_min", "is_traveling"]].isna().all().all()
+    assert out.loc[["F0", "F1", "F2"], "effort_known"].eq(0).all()
+    assert out.drop(["F0", "F1", "F2"])["effort_known"].eq(1).all()

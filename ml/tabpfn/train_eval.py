@@ -75,12 +75,15 @@ def synthetic_data(n: int = 1200, seed: int = 0) -> pd.DataFrame:
         "precip_mm": rng.exponential(0.3, n), "cloud_pct": rng.uniform(0, 100, n),
         "us_aqi": rng.normal(110, 30, n), "tide_m": rng.normal(0, 1, n), "tide_trend": rng.choice([-1.0, 1.0], n),
         "dist_to_coast_km": rng.uniform(0, 40, n), "duration_min": rng.integers(15, 121, n),
-        "is_traveling": rng.integers(0, 2, n)})
+        "is_traveling": rng.integers(0, 2, n).astype(float), "effort_known": 1})
+    unknown = rng.random(n) < 0.3  # exercise feed-only rows (effort unknown)
+    df.loc[unknown, ["duration_min", "is_traveling"]] = np.nan
+    df.loc[unknown, "effort_known"] = 0
     df["apparent_c"] = df["temp_c"] + 2
     df["is_golden_hour"] = ((df.minutes_from_sunrise.between(0, 60)) | (df.minutes_to_sunset.between(0, 60))).astype(int)
     df.loc[rng.random(n) < 0.1, "us_aqi"] = np.nan  # exercise missing values
-    logit = (-0.004 * df.minutes_from_sunrise.clip(0, 600) + 0.02 * df.duration_min - 0.05 * df.dist_to_coast_km
-             + 0.4 * df.is_traveling - 0.02 * df.precip_mm + rng.normal(0, 1, n))
+    logit = (-0.004 * df.minutes_from_sunrise.clip(0, 600) + 0.02 * df.duration_min.fillna(60)
+             - 0.05 * df.dist_to_coast_km + 0.4 * df.is_traveling.fillna(0.5) - 0.02 * df.precip_mm + rng.normal(0, 1, n))
     df["rich"] = (logit > np.median(logit)).astype(int)
     df["hour_band"] = hour_band(df["hour"])
     return df
@@ -104,6 +107,8 @@ def metrics(y, p) -> dict:
 
 def evaluate(df: pd.DataFrame) -> tuple[list[dict], dict]:
     df = df.copy()
+    if "effort_known" not in df:  # older training.csv without the column
+        df["effort_known"] = df["duration_min"].notna().astype(int)
     df["season"] = pd.to_datetime(df["obs_time"], utc=True).dt.tz_convert("Asia/Kolkata").dt.year
     if "hour_band" not in df:
         df["hour_band"] = hour_band(df["hour"])
@@ -140,7 +145,10 @@ def evaluate(df: pd.DataFrame) -> tuple[list[dict], dict]:
     run(f"TabPFN (<= {TABPFN_MAX_TRAIN} train rows)", tabpfn)
     info = {"train_rows": len(train), "test_rows": len(test), "test_season": int(test_season),
             "train_seasons": sorted(int(s) for s in train.season.unique()),
-            "test_rich_rate": float(yt.mean()), "hotspots": df["loc_id"].nunique()}
+            "test_rich_rate": float(yt.mean()), "hotspots": df["loc_id"].nunique(),
+            "train_effort_known": int(train.effort_known.sum()), "test_effort_known": int(test.effort_known.sum()),
+            "per_season": df.groupby("season").agg(rows=("rich", "size"), rich=("rich", "mean"),
+                                                    effort_known=("effort_known", "sum")).reset_index().to_dict("records")}
     return results, info
 
 
@@ -158,6 +166,18 @@ def report(results, info, synthetic: bool) -> str:
         else:
             head += (f"| {r['model']} | {r['roc_auc']:.3f} | {r['brier']:.3f} | {r['precision@0.35']:.3f} | "
                      f"{r['share_flagged']:.2f} | {r['seconds']:.1f} |\n")
+    head += "\n| Season | Split | Rows | With effort (duration/protocol) | Rich rate |\n|---|---|---|---|---|\n"
+    for r in info["per_season"]:
+        split = "test" if r["season"] == info["test_season"] else "train"
+        head += f"| {int(r['season'])} | {split} | {int(r['rows'])} | {int(r['effort_known'])} | {r['rich']:.0%} |\n"
+    head += (f"\nTrain: {info['train_rows']} rows ({info['train_effort_known']} with effort). "
+             f"Test: {info['test_rows']} rows ({info['test_effort_known']} with effort). "
+             f"TabPFN is fit on a stratified subsample of <= {TABPFN_MAX_TRAIN} train rows.\n\n"
+             "**Effort caveat.** Most rows come from eBird's daily checklist feed (`export_ebird.py --feed-only`), "
+             "which has no duration, protocol or complete-checklist flag. For those rows `duration_min` and "
+             "`is_traveling` are NaN and `effort_known` = 0, and the 15-120 min / stationary-traveling / complete "
+             "filters cannot be applied. Long checklists find more species, so the `rich` label is noisier for "
+             "them: part of what the models predict is unobserved effort, not conditions.\n")
     return head + ("\nLabel: rich = species count >= hotspot median (hotspots with >= 10 checklists) else "
                    "hour-band regional median. Target per spec §19: TabPFN AUC >= best baseline + 0.05.\n")
 

@@ -1,0 +1,83 @@
+[
+ {
+  "locId": "L1879869",
+  "subId": "S121487450",
+  "numSpecies": 31,
+  "obsDt": "28 Oct 2022",
+  "obsTime": "14:15",
+  "isoObsDate": "2022-10-28 14:15",
+  "subID": "S121487450",
+  "loc": {
+   "locId": "L1879869",
+   "name": "Sewri Jetty, Mumbai",
+   "latitude": 18.9956148,
+   "longitude": 72.8613456,
+   "countryCode": "IN",
+   "countryName": "India",
+   "subnational1Name": "Maharashtra",
+   "subnational1Code": "IN-MH",
+   "subnational2Code": "IN-MH-MC",
+   "subnational2Name": "Mumbai",
+   "isHotspot": true,
+   "locID": "L1879869",
+   "locName": "Sewri Jetty, Mumbai",
+   "lat": 18.9956148,
+   "lng": 72.8613456,
+   "hierarchicalName": "Sewri Jetty, Mumbai, Mumbai, Maharashtra, IN"
+  }
+ },
+ {
+  "locId": "L21354400",
+  "subId": "S121424892",
+  "numSpecies": 9,
+  "obsDt": "28 Oct 2022",
+  "obsTime": "08:20",
+  "isoObsDate": "2022-10-28 08:20",
+  "subID": "S121424892",
+  "loc": {
+   "locId": "L21354400",
+   "name": "personal location (redacted)",
+   "latitude": 18.91,
+   "longitude": 72.81,
+   "countryCode": "IN",
+   "countryName": "India",
+   "subnational1Name": "Maharashtra",
+   "subnational1Code": "IN-MH",
+   "subnational2Code": "IN-MH-MC",
+   "subnational2Name": "Mumbai",
+   "isHotspot": false,
+   "locID": "L21354400",
+   "locName": "personal location (redacted)",
+   "lat": 18.91,
+   "lng": 72.81,
+   "hierarchicalName": "personal location (redacted)"
+  }
+ },
+ {
+  "locId": "L6501994",
+  "subId": "S121611497",
+  "numSpecies": 20,
+  "obsDt": "28 Oct 2022",
+  "obsTime": "06:26",
+  "isoObsDate": "2022-10-28 06:26",
+  "subID": "S121611497",
+  "loc": {
+   "locId": "L6501994",
+   "name": "personal location (redacted)",
+   "latitude": 19.02,
+   "longitude": 72.86,
+   "countryCode": "IN",
+   "countryName": "India",
+   "subnational1Name": "Maharashtra",
+   "subnational1Code": "IN-MH",
+   "subnational2Code": "IN-MH-MC",
+   "subnational2Name": "Mumbai",
+   "isHotspot": false,
+   "locID": "L6501994",
+   "locName": "personal location (redacted)",
+   "lat": 19.02,
+   "lng": 72.86,
+   "hierarchicalName": "personal location (redacted)"
+  }
+ }
+]

@@ -95,7 +95,7 @@ def build_rows(spots, conditions) -> pd.DataFrame:
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument("--train", default=str(HERE / "cache" / "training.csv"))
+    p.add_argument("--train", default=str(HERE / "training.csv"), help="features + rich CSV (written by features.py)")
     p.add_argument("--dry-run", action="store_true", help="predict but do not write")
     p.add_argument("--api", default=os.environ.get("SITSPOT_API_URL"),
                    help="API base URL (e.g. http://localhost:8787 or https://<tunnel>/api); needs CRON_SECRET")

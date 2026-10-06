@@ -7,6 +7,9 @@ Uses eBird API 2.0 with header X-eBirdApiToken=$EBIRD_API_KEY:
 Every HTTP response is cached under cache/http/, uncached calls are throttled to 1 req/s.
 
   python export_ebird.py --start 2022-09-01 --end 2025-12-31 --max 8000
+  python export_ebird.py --feed-only --merge --start 2022-09-01 --end 2026-10-05
+      feed only: one call per region-day, no checklist/view (effort columns empty);
+      --merge uses an already-cached checklist/view when there is one
   python export_ebird.py --list-regions IN-MH     # verify district codes
 """
 from __future__ import annotations
@@ -35,12 +38,16 @@ COLUMNS = ["checklist_id", "loc_id", "lat", "lon", "obs_time", "duration_min", "
 _last_call = 0.0
 
 
+def cache_path(url: str, params: dict | None = None) -> Path:
+    key = hashlib.sha1(json.dumps([url, sorted((params or {}).items())]).encode()).hexdigest()
+    return CACHE / "http" / f"{key}.json"
+
+
 def cached_get(url: str, params: dict | None = None, headers: dict | None = None,
                min_interval: float = 2.0):
     """GET JSON with an on-disk cache (key excludes headers, so tokens never hit disk)."""
     global _last_call
-    key = hashlib.sha1(json.dumps([url, sorted((params or {}).items())]).encode()).hexdigest()
-    path = CACHE / "http" / f"{key}.json"
+    path = cache_path(url, params)
     if path.exists():
         return json.loads(path.read_text(encoding="utf-8"))
     wait = min_interval - (time.monotonic() - _last_call)
@@ -98,21 +105,57 @@ def checklist_row(item: dict, view: dict, key: str, region: str) -> dict | None:
     }
 
 
+def feed_row(item: dict, key: str, region: str) -> dict | None:
+    """Row from a product/lists item alone. Feed items carry loc.latitude/longitude, numSpecies,
+    isoObsDate ('YYYY-MM-DD HH:MM', local) and obsTime (absent when no start time was entered,
+    then isoObsDate shows a fake 00:00). Effort (duration/protocol/complete) is not in the feed."""
+    if not item.get("obsTime") or item.get("numSpecies") is None:
+        return None
+    loc = item.get("loc") or {}
+    loc_id = item.get("locId") or loc.get("locId")
+    lat, lon = loc.get("latitude", loc.get("lat")), loc.get("longitude", loc.get("lng"))
+    if lat is None:
+        if not loc.get("isHotspot"):
+            return None  # personal location: the API does not expose coordinates
+        try:  # cached per locId by cached_get
+            info = _ebird(f"ref/hotspot/info/{loc_id}", key)
+            lat, lon = info.get("latitude"), info.get("longitude")
+        except requests.HTTPError:
+            return None
+    return {"checklist_id": item.get("subId") or item.get("subID"), "loc_id": loc_id, "lat": lat, "lon": lon,
+            "obs_time": item["isoObsDate"].replace(" ", "T") + ":00+05:30",
+            "duration_min": None, "protocol": None, "num_species": int(item["numSpecies"]),
+            "all_obs_reported": None, "region": region}
+
+
+def cached_view(sub: str) -> dict | None:
+    """checklist/view from the HTTP cache only (never a network call)."""
+    path = cache_path(f"{EBIRD}/product/checklist/view/{sub}")
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
+
+
 def export(regions: list[str], start: date, end: date, months: set[int], max_rows: int,
-           key: str, out: Path, stride: int = 1) -> int:
+           key: str, out: Path, stride: int = 1, feed_only: bool = False, merge: bool = False) -> int:
     rows, seen = [], set()
     try:
         d = start
         while d <= end and len(rows) < max_rows:
             if d.month in months:
                 for region in regions:
-                    for item in _ebird(f"product/lists/{region}/{d.year}/{d.month}/{d.day}", key,
-                                       maxResults=200):
+                    feed = _ebird(f"product/lists/{region}/{d.year}/{d.month}/{d.day}", key,
+                                  maxResults=200)  # API maximum is 200 per call
+                    if len(feed) >= 200:
+                        print(f"note: {region} {d} feed hit the 200 cap, some checklists missed", file=sys.stderr)
+                    for item in feed:
                         sub = item.get("subId") or item.get("subID")
                         if not sub or sub in seen:
                             continue
                         seen.add(sub)
-                        row = checklist_row(item, _ebird(f"product/checklist/view/{sub}", key), key, region)
+                        if feed_only:
+                            view = cached_view(sub) if merge else None
+                            row = checklist_row(item, view, key, region) if view else feed_row(item, key, region)
+                        else:
+                            row = checklist_row(item, _ebird(f"product/checklist/view/{sub}", key), key, region)
                         if row:
                             rows.append(row)
                         if len(rows) >= max_rows:
@@ -138,6 +181,10 @@ def main(argv=None):
     p.add_argument("--out", default=str(CACHE / "checklists.csv"))
     p.add_argument("--stride", type=int, default=1,
                    help="sample every Nth day so every season (incl. the latest test season) is covered")
+    p.add_argument("--feed-only", action="store_true",
+                   help="rows from the daily feed only (1 call per region-day); no duration/protocol")
+    p.add_argument("--merge", action="store_true",
+                   help="with --feed-only: use cached checklist/view details when available")
     p.add_argument("--list-regions", metavar="PARENT", help="print subnational2 codes of PARENT and exit")
     a = p.parse_args(argv)
     key = os.environ.get("EBIRD_API_KEY")
@@ -148,7 +195,7 @@ def main(argv=None):
             print(r["code"], r["name"])
         return
     n = export(a.regions.split(","), date.fromisoformat(a.start), date.fromisoformat(a.end),
-               {int(m) for m in a.months.split(",")}, a.max, key, Path(a.out), a.stride)
+               {int(m) for m in a.months.split(",")}, a.max, key, Path(a.out), a.stride, a.feed_only, a.merge)
     print(f"wrote {n} checklists to {a.out}")
 
 
