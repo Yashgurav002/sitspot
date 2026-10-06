@@ -9,7 +9,7 @@
   "scripts": {
     "typecheck": "tsc -p .",
     "test": "vitest run --passWithNoTests",
-    "worker": "tsx ../apps/api/src/temporal.ts"
+    "worker": "tsx --import ../apps/api/src/instrument.ts ../apps/api/src/temporal.ts"
   },
   "dependencies": {
     "@temporalio/activity": "^1.24.0",

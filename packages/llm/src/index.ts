@@ -31,6 +31,23 @@ export interface LlmConfig {
   /** Fold system messages into the first user message. Default: true when model name contains "gemma". */
   mergeSystem?: boolean;
   fetch?: typeof fetch;
+  /** Per-client tracer; falls back to the global one from setLlmTracer. */
+  tracer?: LlmTracer;
+}
+
+/** Observability hook: called when a request starts; the returned fn is called once when it ends.
+ *  Gets ids/counts only — never message text. */
+export type LlmTracer = (call: { op: 'chat' | 'stream' | 'embed'; model: string }) => (result: {
+  latency_ms: number;
+  tokens_in?: number;
+  tokens_out?: number;
+  error?: unknown;
+}) => void;
+
+let globalTracer: LlmTracer | undefined;
+/** Install a tracer for every client, including ones created before this call. */
+export function setLlmTracer(t: LlmTracer | undefined): void {
+  globalTracer = t;
 }
 
 export interface Llm {
@@ -122,6 +139,21 @@ export function createLlm(cfg: LlmConfig): Llm {
   const doFetch = cfg.fetch ?? fetch;
   const merge = cfg.mergeSystem ?? /gemma/i.test(cfg.model);
 
+  /** Run fn under the tracer (if any). fn returns the value plus token counts for the span. */
+  async function traced<T>(op: 'chat' | 'stream' | 'embed', fn: () => Promise<{ value: T; usage?: Usage | null }>): Promise<T> {
+    const end = (cfg.tracer ?? globalTracer)?.({ op, model: cfg.model });
+    const t0 = performance.now();
+    const ms = () => Math.round(performance.now() - t0);
+    try {
+      const { value, usage } = await fn();
+      end?.({ latency_ms: ms(), ...usage });
+      return value;
+    } catch (error) {
+      end?.({ latency_ms: ms(), error });
+      throw error;
+    }
+  }
+
   async function post(path: string, body: unknown): Promise<Response> {
     const url = `${base}${path}`;
     const headers: Record<string, string> = { 'content-type': 'application/json' };
@@ -153,7 +185,13 @@ export function createLlm(cfg: LlmConfig): Llm {
     };
   }
 
-  async function chatRaw(messages: Message[], opts: ChatOpts, extra?: Record<string, unknown>): Promise<ChatResult> {
+  const chatRaw = (messages: Message[], opts: ChatOpts, extra?: Record<string, unknown>) =>
+    traced('chat', async () => {
+      const value = await chatOnce(messages, opts, extra);
+      return { value, usage: value.usage };
+    });
+
+  async function chatOnce(messages: Message[], opts: ChatOpts, extra?: Record<string, unknown>): Promise<ChatResult> {
     const t0 = performance.now();
     const res = await post('/chat/completions', chatBody(messages, opts, extra));
     const data = (await res.json()) as {
@@ -177,26 +215,44 @@ export function createLlm(cfg: LlmConfig): Llm {
     chat: (messages, opts = {}) => chatRaw(messages, opts),
 
     async *chatStream(messages, opts = {}) {
-      const res = await post('/chat/completions', chatBody(messages, opts, { stream: true }));
-      if (!res.body) return;
-      const decoder = new TextDecoder();
-      let buf = '';
-      const unthink = thinkingFilter();
-      for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
-        buf += decoder.decode(chunk, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf('\n')) !== -1) {
-          const line = buf.slice(0, nl).trim();
-          buf = buf.slice(nl + 1);
-          if (!line.startsWith('data:')) continue;
-          const payload = line.slice(5).trim();
-          if (payload === '[DONE]') return;
-          try {
-            const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
-            const out = delta ? unthink(delta as string) : '';
-            if (out) yield out;
-          } catch {
-            // ponytail: skip malformed SSE lines rather than kill the stream
+      const end = (cfg.tracer ?? globalTracer)?.({ op: 'stream', model: cfg.model });
+      const t0 = performance.now();
+      let usage: Usage | undefined;
+      let error: unknown;
+      try {
+        yield* stream();
+      } catch (e) {
+        error = e;
+        throw e;
+      } finally {
+        end?.({ latency_ms: Math.round(performance.now() - t0), ...usage, ...(error !== undefined && { error }) });
+      }
+
+      async function* stream(): AsyncGenerator<string> {
+        const res = await post('/chat/completions', chatBody(messages, opts, { stream: true }));
+        if (!res.body) return;
+        const decoder = new TextDecoder();
+        let buf = '';
+        const unthink = thinkingFilter();
+        for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
+          buf += decoder.decode(chunk, { stream: true });
+          let nl: number;
+          while ((nl = buf.indexOf('\n')) !== -1) {
+            const line = buf.slice(0, nl).trim();
+            buf = buf.slice(nl + 1);
+            if (!line.startsWith('data:')) continue;
+            const payload = line.slice(5).trim();
+            if (payload === '[DONE]') return;
+            try {
+              const parsed = JSON.parse(payload);
+              const u = parsed?.usage; // sent by providers that honour stream_options.include_usage
+              if (u) usage = { tokens_in: u.prompt_tokens ?? 0, tokens_out: u.completion_tokens ?? 0 };
+              const delta = parsed?.choices?.[0]?.delta?.content;
+              const out = delta ? unthink(delta as string) : '';
+              if (out) yield out;
+            } catch {
+              // ponytail: skip malformed SSE lines rather than kill the stream
+            }
           }
         }
       }
@@ -224,11 +280,16 @@ export function createLlm(cfg: LlmConfig): Llm {
       return { ok: true, value: v.data, raw, usage: r.usage, latency_ms: r.latency_ms };
     },
 
-    async embed(texts) {
-      const res = await post('/embeddings', { model: cfg.model, input: texts });
-      const data = (await res.json()) as { data: { index?: number; embedding: number[] }[] };
-      return [...data.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0)).map((d) => d.embedding);
-    },
+    embed: (texts) =>
+      traced('embed', async () => {
+        const res = await post('/embeddings', { model: cfg.model, input: texts });
+        const data = (await res.json()) as {
+          data: { index?: number; embedding: number[] }[];
+          usage?: { prompt_tokens?: number };
+        };
+        const value = [...data.data].sort((a, b) => (a.index ?? 0) - (b.index ?? 0)).map((d) => d.embedding);
+        return { value, usage: data.usage?.prompt_tokens != null ? { tokens_in: data.usage.prompt_tokens, tokens_out: 0 } : null };
+      }),
   };
 }
 

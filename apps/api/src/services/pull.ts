@@ -1,5 +1,6 @@
 import { fetchConditions, fetchRecentSightings } from "@sitspot/data";
 import { listAllSpots, upsertConditions, upsertSightings, type Db } from "@sitspot/db";
+import { withSpan } from "../observability";
 
 export type PullSummary = {
   spots: number;
@@ -28,19 +29,25 @@ export async function pullAll(
 
   for (const spot of spots) {
     try {
-      const rows = await fetchConditions(spot, { fetch: opts.fetch, now });
-      await upsertConditions(db, rows);
-      out.conditionRows += rows.length;
+      await withSpan("pull conditions", "data.pull", { spot_id: spot.id, source: "open-meteo" }, async (set) => {
+        const rows = await fetchConditions(spot, { fetch: opts.fetch, now });
+        await upsertConditions(db, rows);
+        out.conditionRows += rows.length;
+        set({ rows: rows.length });
+      });
     } catch (e) {
       out.errors.push({ spot_id: spot.id, source: "conditions", error: (e as Error).message });
     }
     const last = marks.get(spot.id);
     if (!opts.ebirdKey || (last !== undefined && now.getTime() - last < DAY)) continue;
     try {
-      const rows = await fetchRecentSightings(spot.lat, spot.lon, opts.ebirdKey, { fetch: opts.fetch });
-      await upsertSightings(db, rows);
-      out.sightingRows += rows.length;
-      marks.set(spot.id, now.getTime());
+      await withSpan("pull sightings", "data.pull", { spot_id: spot.id, source: "ebird" }, async (set) => {
+        const rows = await fetchRecentSightings(spot.lat, spot.lon, opts.ebirdKey!, { fetch: opts.fetch });
+        await upsertSightings(db, rows);
+        out.sightingRows += rows.length;
+        marks.set(spot.id, now.getTime());
+        set({ rows: rows.length });
+      });
     } catch (e) {
       out.errors.push({ spot_id: spot.id, source: "ebird", error: (e as Error).message });
     }

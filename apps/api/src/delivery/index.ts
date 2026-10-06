@@ -5,6 +5,7 @@ import type { Db } from "@sitspot/db";
 import type { Invitation } from "@sitspot/shared";
 import { callConfigured, placeCall } from "./call";
 import { sendPush, type PushSender } from "./push";
+import { withSpan } from "../observability";
 
 export { placeCall, callConfigured } from "./call";
 export { sendPush, pushConfigured, type PushSender, type PushMessage } from "./push";
@@ -23,7 +24,14 @@ export function createDeliver({ db, env, fetch: f, push }: {
   /** Injectable web-push sender (tests). */
   push?: PushSender;
 }): Deliver {
-  return async (inv, script) => {
+  return (inv, script) =>
+    withSpan("deliver", "delivery", { invitation_id: inv.id }, async (set) => {
+      const r = await deliverOnce(inv, script);
+      set({ channel: r.channel, call_failed: "call_error" in r && !!r.call_error });
+      return r;
+    });
+
+  async function deliverOnce(...[inv, script]: Parameters<Deliver>): Promise<DeliveryResult> {
     let call_error: string | undefined;
     if (callConfigured(env)) {
       try {
@@ -44,5 +52,5 @@ export function createDeliver({ db, env, fetch: f, push }: {
       console.warn(`[deliver] nothing delivered for ${inv.id}: ${error}`);
       return { channel: "none", error };
     }
-  };
+  }
 }

@@ -10,6 +10,7 @@ import {
 } from "@sitspot/workflows";
 import { createActivities, type ActivityDeps, type Deliver } from "./activities";
 import { DEMO_EMAIL, type Signals } from "./app";
+import { activityInterceptor, sentryEnabled } from "./observability";
 
 export type TemporalHandle = {
   /** Plug into createApp({ signals }). */
@@ -50,6 +51,7 @@ export async function startTemporal(deps: TemporalDeps): Promise<TemporalHandle 
     taskQueue: TASK_QUEUE,
     workflowsPath,
     activities: createActivities(deps),
+    ...(sentryEnabled() && { interceptors: { activity: [activityInterceptor] } }),
   });
   const running = worker.run().catch((e) => console.error("[temporal] worker stopped:", e));
 

@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { AddressInfo } from 'node:net';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { createLlm, extractJson, llmFromEnv, LlmHttpError, mergeSystemMessages } from '../src/index.js';
+import { createLlm, extractJson, llmFromEnv, LlmHttpError, mergeSystemMessages, setLlmTracer, type LlmTracer } from '../src/index.js';
 
 type Handler = (body: any, res: ServerResponse) => void;
 let handler: Handler;
@@ -157,6 +157,24 @@ describe('client against fake server', () => {
       res.end(JSON.stringify({ data: [{ index: 1, embedding: [2] }, { index: 0, embedding: [1] }] }));
     expect(await createLlm({ baseUrl, model: 'e' }).embed(['a', 'b'])).toEqual([[1], [2]]);
     expect(requests[0]).toMatchObject({ url: '/v1/embeddings', body: { model: 'e', input: ['a', 'b'] } });
+  });
+
+  it('tracer sees op, model, tokens and errors (global + per-client)', async () => {
+    const seen: unknown[] = [];
+    const tracer: LlmTracer = (call) => (r) => seen.push({ ...call, ...r, error: r.error ? 'err' : undefined });
+    handler = reply('hi');
+    await createLlm({ baseUrl, model: 'm', tracer }).chat(msgs);
+    handler = (_b, res) => ((res.statusCode = 500), res.end('x'));
+    setLlmTracer(tracer);
+    try {
+      await createLlm({ baseUrl, model: 'g' }).chat(msgs).catch(() => {});
+    } finally {
+      setLlmTracer(undefined);
+    }
+    expect(seen).toMatchObject([
+      { op: 'chat', model: 'm', tokens_in: 10, tokens_out: 5, latency_ms: expect.any(Number) },
+      { op: 'chat', model: 'g', error: 'err' },
+    ]);
   });
 });
 

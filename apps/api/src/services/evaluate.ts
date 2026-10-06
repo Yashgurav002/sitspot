@@ -5,6 +5,7 @@ import {
 } from "@sitspot/db";
 import { evaluateWindows, pickInvitation, type EvaluateInput, type TideEvent, type TideEvents } from "@sitspot/policy";
 import type { Candidate, Spot } from "@sitspot/shared";
+import { withSpan } from "../observability";
 import { acceptFactorsByHour, buildRules } from "./memory";
 
 const HOUR = 3_600_000;
@@ -94,7 +95,11 @@ export async function evaluateForUser(
   userId: string,
   now: Date,
 ): Promise<{ candidates: (Candidate & { held?: string })[]; pick: Candidate | null; threshold: number }> {
-  const { input, threshold } = await buildEvaluateInput(db, userId, now);
-  const candidates = evaluateWindows(input);
-  return { candidates, pick: pickInvitation(candidates, threshold, now), threshold };
+  return withSpan("policy.evaluate", "policy.evaluate", { user_id: userId }, async (set) => {
+    const { input, threshold } = await buildEvaluateInput(db, userId, now);
+    const candidates = evaluateWindows(input);
+    const pick = pickInvitation(candidates, threshold, now);
+    set({ candidates: candidates.length, threshold, picked: !!pick, spot_id: pick?.spot_id, score: pick?.score });
+    return { candidates, pick, threshold };
+  });
 }

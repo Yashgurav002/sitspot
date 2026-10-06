@@ -6,7 +6,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 
 **Done:** T00–T13, T15 — all committed with passing tests (`git log --oneline`).
 **In progress (agents may have been interrupted — check `git status` for uncommitted work):**
-- T14 Sentry (API/workers/LLM part). Web part of Sentry still to do.
+- T14: API/workers/LLM Sentry done (no-op without SENTRY_DSN_API). Web (@sentry/nextjs) part still to do.
 - T16 Evaluation (retrieval, agent safety, voice latency, 20-kill durability) → `evaluation/`.
 - eBird export for TabPFN running in background → `ml/tabpfn/cache/checklists.csv`, log `ml/tabpfn/cache/export.log`. Cached; rerun the same command to resume:
   `cd ml/tabpfn && EBIRD_API_KEY=... .venv/Scripts/python export_ebird.py --start 2022-09-01 --end 2026-10-05 --max 8000`

@@ -19,6 +19,7 @@ import { mcpHandler } from "./mcp";
 import { llmFromEnv, type Llm } from "@sitspot/llm";
 import { voicePublic, voiceSession, type VoiceDeps } from "./voice";
 import type { PushSender } from "./delivery";
+import { honoSentry } from "./observability";
 
 export type Signals = {
   responded?(invitationId: string, accepted: boolean): unknown;
@@ -103,6 +104,8 @@ export function createApp(deps: AppDeps) {
   };
 
   const app = new Hono<Env>();
+  const sentry = honoSentry(app);
+  if (sentry) app.use(sentry);
 
   app.onError((err, c) => {
     if (err instanceof HTTPException) return c.json({ error: err.message || "error" }, err.status);

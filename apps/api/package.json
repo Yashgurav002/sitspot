@@ -4,14 +4,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "dev": "tsx watch --import ./src/instrument.ts src/server.ts",
+    "start": "tsx --import ./src/instrument.ts src/server.ts",
     "typecheck": "tsc -p .",
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.3",
     "@modelcontextprotocol/sdk": "^1.32.0",
+    "@sentry/node": "^11.4.0",
     "@sitspot/agent": "workspace:*",
     "@sitspot/data": "workspace:*",
     "@sitspot/db": "workspace:*",
