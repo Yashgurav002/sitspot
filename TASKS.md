@@ -9,7 +9,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 - T14: API/workers/LLM Sentry done (no-op without SENTRY_DSN_API). Web (@sentry/nextjs) part still to do.
 - T16 Evaluation (retrieval, agent safety, voice latency, 20-kill durability) → `evaluation/`.
 - eBird export for TabPFN running in background → `ml/tabpfn/cache/checklists.csv`, log `ml/tabpfn/cache/export.log`. Cached; rerun the same command to resume:
-  `cd ml/tabpfn && EBIRD_API_KEY=... .venv/Scripts/python export_ebird.py --start 2022-09-01 --end 2026-10-05 --max 8000`
+  `cd ml/tabpfn && EBIRD_API_KEY=... .venv/Scripts/python export_ebird.py --start 2022-09-01 --end 2026-10-05 --stride 3 --max 8000` (eBird 429s after ~600 fast calls; script backs off. Later rerun with `--stride 1` to fill in days — cached calls are free.)
   Then: `features.py` → `train_eval.py` (writes `evaluation/tabpfn_results.md`).
 
 **Next up:** T18 deploy (decide API/worker host + Postgres + public GitHub repo) → T19 docs → T17 fine-tune (optional).
