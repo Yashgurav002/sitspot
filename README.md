@@ -129,7 +129,7 @@ Real numbers only, copied from `evaluation/*.md`, misses included. All of it was
 - **Web-side Sentry is not wired.** Only API, worker, LLM and data spans are traced.
 - Tide comes from Open-Meteo's open-coast sea-level model, so it's used for **timing only** (trend, next low/high), never heights. Creek lag is not modelled.
 - Keyword search is Postgres full-text, not BM25.
-- The demo account (`DEMO_READONLY_USER_ID`) and phone-number encryption (`PHONE_ENCRYPTION_KEY`) are in `.env.example` but **not implemented**.
+- A read-only demo session exists (`POST /auth/demo`, "View demo" on the login page) but its account starts empty — no seeded demo week yet. Your phone number lives only in env (`MY_PHONE_E164`); it is never stored in the database.
 - Sign-in is a single-user passcode with no login rate limit.
 - The fine-tuned note model (T17) is not started. `ml/finetune` is empty.
 - No licence file for this repo yet.
