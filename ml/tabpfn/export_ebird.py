@@ -36,7 +36,7 @@ _last_call = 0.0
 
 
 def cached_get(url: str, params: dict | None = None, headers: dict | None = None,
-               min_interval: float = 1.0):
+               min_interval: float = 1.5):
     """GET JSON with an on-disk cache (key excludes headers, so tokens never hit disk)."""
     global _last_call
     key = hashlib.sha1(json.dumps([url, sorted((params or {}).items())]).encode()).hexdigest()
@@ -46,8 +46,15 @@ def cached_get(url: str, params: dict | None = None, headers: dict | None = None
     wait = min_interval - (time.monotonic() - _last_call)
     if wait > 0:
         time.sleep(wait)
-    _last_call = time.monotonic()
-    r = requests.get(url, params=params, headers=headers, timeout=60)
+    for attempt in range(1, 7):
+        _last_call = time.monotonic()
+        r = requests.get(url, params=params, headers=headers, timeout=60)
+        if r.status_code not in (429, 500, 502, 503, 504) or attempt == 6:
+            break
+        # eBird rate-limits even at 1 req/s; back off (honour Retry-After when given).
+        pause = float(r.headers.get("Retry-After") or 60 * attempt)
+        print(f"HTTP {r.status_code}, backing off {pause:.0f}s (attempt {attempt})", file=sys.stderr)
+        time.sleep(pause)
     r.raise_for_status()  # failures are not cached
     data = r.json()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +92,7 @@ def checklist_row(item: dict, view: dict, key: str, region: str) -> dict | None:
 
 
 def export(regions: list[str], start: date, end: date, months: set[int], max_rows: int,
-           key: str, out: Path) -> int:
+           key: str, out: Path, stride: int = 1) -> int:
     rows, seen = [], set()
     try:
         d = start
@@ -104,7 +111,7 @@ def export(regions: list[str], start: date, end: date, months: set[int], max_row
                         if len(rows) >= max_rows:
                             break
                 print(f"{d} rows={len(rows)}", file=sys.stderr)
-            d += timedelta(days=1)
+            d += timedelta(days=stride)
     finally:  # Ctrl-C keeps what we have; the HTTP cache makes reruns cheap
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", newline="", encoding="utf-8") as f:
@@ -122,6 +129,8 @@ def main(argv=None):
     p.add_argument("--months", default="9,10,11,12", help="only dates in these months (Sep-Dec season)")
     p.add_argument("--max", type=int, default=8000)
     p.add_argument("--out", default=str(CACHE / "checklists.csv"))
+    p.add_argument("--stride", type=int, default=1,
+                   help="sample every Nth day so every season (incl. the latest test season) is covered")
     p.add_argument("--list-regions", metavar="PARENT", help="print subnational2 codes of PARENT and exit")
     a = p.parse_args(argv)
     key = os.environ.get("EBIRD_API_KEY")
@@ -132,7 +141,7 @@ def main(argv=None):
             print(r["code"], r["name"])
         return
     n = export(a.regions.split(","), date.fromisoformat(a.start), date.fromisoformat(a.end),
-               {int(m) for m in a.months.split(",")}, a.max, key, Path(a.out))
+               {int(m) for m in a.months.split(",")}, a.max, key, Path(a.out), a.stride)
     print(f"wrote {n} checklists to {a.out}")
 
 
