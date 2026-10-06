@@ -6,11 +6,9 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 
 **Done:** T00–T13, T15 — all committed with passing tests (`git log --oneline`).
 **In progress (agents may have been interrupted — check `git status` for uncommitted work):**
-- T14: API/workers/LLM Sentry done (no-op without SENTRY_DSN_API). Web (@sentry/nextjs) part still to do.
+- T14 done (API + web Sentry; no-op without DSNs).
 - T16 done (`evaluation/`) + eval fix-up done: coast-after-dark enforced in agent (unsafe advice 12.5% → 2.5%), confidence bands enforced (right band 43% → 88%), past-low-tide check, LLM activity timeout 10 min.
-- eBird export (feed-only: one call per region-day, ~20x fewer calls; rows lack duration/protocol → noisier "rich" label, must be stated in results) running DETACHED since 2026-10-06 ~17:10 IST, ETA ~19:30–20:00. Log: `ml/tabpfn/cache/export.log`. Output: `ml/tabpfn/cache/checklists.csv`. If it stopped, resume (cached):
-  `cd ml/tabpfn && EBIRD_API_KEY=<from .env> .venv/Scripts/python export_ebird.py --feed-only --merge --start 2022-09-01 --end 2026-10-05 --max 100000`
-  Then (no tokens needed): `.venv/Scripts/python features.py` → `.venv/Scripts/python train_eval.py` (writes `evaluation/tabpfn_results.md` — check it states the feed-only/effort caveat). Agent that built feed-only mode was stopped before the real run to save tokens; feed-only code + 14 pytest tests pass.
+- TabPFN real run DONE (19,588 rows, 2022–2026): `evaluation/tabpfn_results.md` — AUC 0.649 ≈ baseline 0.650 (target missed), best precision@0.35 (0.627). Training data at `ml/tabpfn/training.csv` (gitignored: eBird data terms) — the laptop's hourly `forecast_job.py --api` uses it.
 
 **Next up (tomorrow):** create public repo `Yashgurav002/sitspot` (personal account only — see identity note) and push → Vercel import. T18 in progress — decided: everything on the laptop + one HTTPS tunnel (ngrok static domain recommended) to the Next app, which proxies `/api/*` to the API (same origin, no cross-site cookies); DB stays PGlite; TabPFN forecast job talks to the API (`--api`) instead of Postgres; `pnpm start` runs Temporal + API + web + local hourly cron. T19 first-pass docs done (README, docs/). T17 fine-tune optional.
 
