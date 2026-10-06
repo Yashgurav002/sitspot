@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
+/* Calm outdoors palette: paper + moss by day, night forest by dark. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --bg: #f5f3ec;
+  --surface: #fffdf7;
+  --fg: #1f2a22;
+  --muted: #5f6b61;
+  --line: #ddd8c8;
+  --accent: #2f6b4f;
+  --accent-fg: #ffffff;
+  --warn: #9a4a1c;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --bg: #111814;
+    --surface: #18221c;
+    --fg: #e6ebe4;
+    --muted: #9aa89d;
+    --line: #2b3a31;
+    --accent: #7cc49b;
+    --accent-fg: #0d1a12;
+    --warn: #f0a070;
   }
 }
 
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-warn: var(--warn);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-line bg-surface p-4;
+  }
+  .btn {
+    @apply inline-flex min-h-12 items-center justify-center rounded-xl bg-accent px-5 font-medium text-accent-fg disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex min-h-12 items-center justify-center rounded-xl border border-line px-5 font-medium disabled:opacity-50;
+  }
+  .field {
+    @apply min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-base;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-muted;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
 }

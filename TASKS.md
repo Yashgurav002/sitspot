@@ -23,7 +23,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 
 - [~] **T06 `packages/agent`** — context block builder (§9.2), system prompt (§9.3), `composeScript`, `chat`, `extractIntent`, `writeNote`; grounding validators (numbers-in-facts, species-in-facts, quote-substring, coastal safety line, note verifier); retry-once then deterministic template fallback. Deps: T01, T05.
   Checks: unit tests for every validator; `tests/when_ai_is_wrong.test.ts` feeding hallucinating fake LLM outputs → all rejected/replaced.
-- [ ] **T07 `apps/api` core** — Hono server: `/health`, passcode auth, `/v1/spots` CRUD, conditions, sightings, invitations list/get/respond, visits arrive/detections/observations/end, notes + search, preferences, `/cron/pull`, `/cron/forecast-ingest`, push subscribe. Deps: T02, T03.
+- [~] **T07 `apps/api` core** — Hono server: `/health`, passcode auth, `/v1/spots` CRUD, conditions, sightings, invitations list/get/respond, visits arrive/detections/observations/end, notes + search, preferences, `/cron/pull`, `/cron/forecast-ingest`, push subscribe. Deps: T02, T03.
   Checks: route tests with `app.request()` on PGlite; `/cron/pull` integration test with fixture-backed fetch.
 - [~] **T08 `ml/tabpfn`** — `export_ebird.py` (cache, 1 req/s), `features.py`, `train_eval.py` (TabPFN vs hotspot×hour avg, logistic regression, XGBoost; time split; AUC/Brier/precision@threshold → `evaluation/tabpfn_results.md`), `forecast_job.py`. Deps: T02 (schema).
   Checks: pytest on features + labelling with a small synthetic fixture; scripts run end-to-end on fixture data. Real run needs `EBIRD_API_KEY`.
@@ -34,7 +34,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
   Checks: time-skipping tests: accept→arrive→end→completed; decline; no-answer; missed; recheck-cancel; deterministic IDs prevent duplicates; worker restart resumes without duplicate delivery.
 - [ ] **T10 Delivery + voice** — Web Push (VAPID), ElevenLabs outbound call client, custom-LLM SSE endpoint `/v1/voice/llm/chat/completions`, post-call webhook with HMAC verification. Deps: T06, T07.
   Checks: SSE endpoint returns valid OpenAI chunks (test); webhook rejects bad signature; call failure falls back to push.
-- [~] **T11 `apps/web`** — Next.js PWA: passcode sign-in, Spots page (Leaflet map), settings (quiet hours, loves), invitations history with factor breakdown, notes + search, `/call/[id]`, service worker for push, manifest. Deps: T07.
+- [x] **T11 `apps/web`** — Next.js PWA: passcode sign-in, Spots page (Leaflet map), settings (quiet hours, loves), invitations history with factor breakdown, notes + search, `/call/[id]`, service worker for push, manifest. Deps: T07.
   Checks: `next build` passes; Playwright smoke: sign in → add spot → see it listed.
 - [~] **T12 Visit page + BirdNET** — `/visit/[id]`: arrive, wake lock, pocket overlay with 2-s hold exit, mic capture, Web Worker running BirdNET TF.js (or documented honest fallback), regional filter, dedupe, IndexedDB outbox, observations, end + rating. Deps: T11.
   Checks: unit tests for dedupe/outbox/filter; build passes; manual terrace test.

@@ -1,69 +1,100 @@
-import Image from "next/image";
+"use client";
+import Link from "next/link";
+import { api, type WSpot } from "@/lib/api";
+import { currentHour, leaveBy, openInvitation, summarise, time } from "@/lib/format";
+import { Empty, ErrorBox, Loading, PageTitle, useLoad } from "@/components/ui";
+import { Respond } from "@/components/respond";
 
 export default function Home() {
+  const { data, error, loading, reload } = useLoad(() => Promise.all([api.spots(), api.invitations()]));
+
+  if (loading && !data) return <Loading />;
+  if (error) return <ErrorBox error={error} retry={reload} />;
+  const [spots, invitations] = data!;
+  const inv = openInvitation(invitations);
+  const spot = inv && spots.find((s) => s.id === inv.spot_id);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+    <>
+      <PageTitle sub="Your places, calling you.">Sitspot</PageTitle>
+
+      <section aria-labelledby="next" className="mb-8">
+        <h2 id="next" className="sr-only">
+          Next invitation
+        </h2>
+        {inv ? (
+          <article className="card space-y-3">
+            <p className="text-sm font-medium text-accent">An invitation</p>
+            <h3 className="text-xl font-semibold">{spot?.name ?? "One of your spots"}</h3>
+            <p>{inv.reason}</p>
+            <dl className="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <dt className="text-muted">Window</dt>
+                <dd>
+                  {time(inv.window_start)} – {time(inv.window_end)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted">Leave by</dt>
+                <dd>{time(leaveBy(inv.window_start, spot?.travel_min ?? 0))}</dd>
+              </div>
+            </dl>
+            <Respond inv={inv} />
+            <Link href={`/invitations/${inv.id}`} className="block text-sm text-muted underline">
+              Why this?
+            </Link>
+          </article>
+        ) : (
+          <Empty>Nothing calling right now. We&apos;ll ring when one of your places is worth it.</Empty>
+        )}
+      </section>
+
+      <section aria-labelledby="today" className="mb-8">
+        <h2 id="today" className="mb-3 text-lg font-semibold">
+          Your spots today
+        </h2>
+        {spots.length === 0 ? (
+          <Empty>
+            No spots yet.{" "}
+            <Link href="/spots" className="text-accent underline">
+              Add 3–5 places
+            </Link>{" "}
+            you could actually go.
+          </Empty>
+        ) : (
+          <ul className="space-y-2">
+            {spots.map((s) => (
+              <SpotRow key={s.id} spot={s} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <nav className="flex gap-4 text-sm">
+        <Link href="/invitations" className="text-accent underline">
+          Invitation history
+        </Link>
+        <Link href="/notes" className="text-accent underline">
+          Field notes
+        </Link>
+      </nav>
+    </>
+  );
+}
+
+function SpotRow({ spot }: { spot: WSpot }) {
+  const { data, error, loading } = useLoad(() => api.conditions(spot.id, 12), [spot.id]);
+  return (
+    <li className="card flex items-baseline justify-between gap-3">
+      <div>
+        <p className="font-medium">{spot.name}</p>
+        <p className="text-xs text-muted capitalize">
+          {spot.kind} · {spot.travel_min} min away
+        </p>
+      </div>
+      <p className="text-right text-sm text-muted">
+        {loading ? "…" : error ? "Conditions unavailable" : summarise(currentHour(data?.conditions ?? []))}
+      </p>
+    </li>
   );
 }
