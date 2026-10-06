@@ -30,9 +30,9 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 
 ## Wave 3 — Loop (parallel, after Wave 2)
 
-- [ ] **T09 `workflows/`** — Temporal `UserDayWorkflow`, `InvitationWorkflow`, signals/queries, activities wired to db/policy/agent/delivery; worker entry `pnpm worker`. Deps: T04, T06, T07.
+- [~] **T09 `workflows/`** — Temporal `UserDayWorkflow`, `InvitationWorkflow`, signals/queries, activities wired to db/policy/agent/delivery; worker entry `pnpm worker`. Deps: T04, T06, T07.
   Checks: time-skipping tests: accept→arrive→end→completed; decline; no-answer; missed; recheck-cancel; deterministic IDs prevent duplicates; worker restart resumes without duplicate delivery.
-- [ ] **T10 Delivery + voice** — Web Push (VAPID), ElevenLabs outbound call client, custom-LLM SSE endpoint `/v1/voice/llm/chat/completions`, post-call webhook with HMAC verification. Deps: T06, T07.
+- [~] **T10 Delivery + voice** — Web Push (VAPID), ElevenLabs outbound call client, custom-LLM SSE endpoint `/v1/voice/llm/chat/completions`, post-call webhook with HMAC verification. Deps: T06, T07.
   Checks: SSE endpoint returns valid OpenAI chunks (test); webhook rejects bad signature; call failure falls back to push.
 - [x] **T11 `apps/web`** — Next.js PWA: passcode sign-in, Spots page (Leaflet map), settings (quiet hours, loves), invitations history with factor breakdown, notes + search, `/call/[id]`, service worker for push, manifest. Deps: T07.
   Checks: `next build` passes; Playwright smoke: sign in → add spot → see it listed.
