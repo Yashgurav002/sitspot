@@ -1,0 +1,31 @@
+s01 84159 ms ok |  | Let's head to Creek edge. There is 1 Common Kingfisher and 6 Little Egrets. Leave by 17:05. It stays good until 18:05. Stay on firm ground. Want to go?
+s02 69568 ms ok |  | Rangaon beach. Low tide is 17:40 at 0.8 m and it is 29°C. Leave by 17:05. It stays good until 18:05. Stay on firm ground. Want to go?
+s03 111532 ms ok |  | Let's go to Vasai Fort. It's 30°C, the US AQI is 85, and golden hour is from 17:30. Leave by 17:05. It stays good until 18:05. Stay on firm ground. Want to go?
+s04 64184 ms ok |  | Let's head to Lake park. It's 27°C. The US AQI is 75. Leave by 17:05. It stays good until 18:05. Want to go?
+s05 37249 ms FALLBACK | model error: LLM HTTP 503 from https://generativelanguage.googleapis.com/v1beta/openai/chat/completions: [{
+  "error": {
+    "code": 503,
+    "message": "This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+    "status": "UNAVAILABLE"
+  }
+}
+] | Terrace looks good right now. It feels like 29°C with US AQI 110. Leave by 17:05, it's about 1 minutes away, and it stays good until 18:05. Want to go?
+s06 70650 ms ok |  | Let's go to Creek edge. Low tide is 17:20 (0.6 m) and it's 28°C. Golden hour begins at 17:30. Leave by 17:05; it stays good until 18:05. Stay on firm ground. Want to go?
+s07 98983 ms ok |  | Let's go to Creek edge. There are Pied Kingfisher ×2, Terek Sandpiper ×5, and low tide 17:20 (0.6 m). Leave by 17:05. It stays good until 18:05. Stay on firm ground. Want to go?
+s08 82405 ms ok |  | Let's head to Rangaon beach. The low tide is 0.4 m and sunset is 18:15. Leave by 17:05. It stays good until 18:05. Stay on firm ground. Want to go?
+s09 916 ms FALLBACK | model error: LLM HTTP 500 from https://generativelanguage.googleapis.com/v1beta/openai/chat/completions: [{
+  "error": {
+    "code": 500,
+    "message": "Internal error encountered.",
+    "status": "INTERNAL"
+  }
+}
+] | Vasai Fort looks good right now. 1 Shikra was reported nearby, it feels like 30°C with US AQI 85 and golden hour starts at 17:30. Leave by 17:05, it's about 15 minutes away, and it stays good until 18:05. Want to go?
+s10 942 ms FALLBACK | model error: LLM HTTP 500 from https://generativelanguage.googleapis.com/v1beta/openai/chat/completions: [{
+  "error": {
+    "code": 500,
+    "message": "Internal error encountered.",
+    "status": "INTERNAL"
+  }
+}
+] | Lake park looks good right now. 4 Indian Pond Herons were reported nearby and it feels like 27°C with US AQI 75. Leave by 17:05, it's about 8 minutes away, and it stays good until 18:05. Want to go?

@@ -1,0 +1,3 @@
+id,kill_point,signal_sent_while_worker_down,result,recheckWindow,composeScript,deliver,compileVisit,statuses,correct,error,ms
+1,visitEnded,false,completed,1,1,1,1,accepted arrived completed,true,"",120355
+2,visitEnded,true,completed,1,1,1,1,accepted arrived completed,true,"",120309

@@ -1,0 +1,25 @@
+{
+  "name": "@sitspot/evaluation",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "retrieval": "tsx retrieval/run.ts",
+    "agent:chat": "tsx agent/run.ts chat",
+    "agent:script": "tsx agent/run.ts script",
+    "latency": "tsx agent/latency.ts",
+    "agent:report": "tsx agent/report.ts",
+    "durability:inflight": "tsx durability/run.ts inflight",
+    "durability": "tsx durability/run.ts"
+  },
+  "dependencies": {
+    "@sitspot/agent": "workspace:*",
+    "@sitspot/db": "workspace:*",
+    "@sitspot/llm": "workspace:*",
+    "@sitspot/shared": "workspace:*",
+    "@sitspot/workflows": "workspace:*",
+    "@temporalio/testing": "^1.24.0",
+    "@temporalio/worker": "^1.24.0"
+  }
+}

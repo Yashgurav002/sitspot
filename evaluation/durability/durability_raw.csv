@@ -1,0 +1,21 @@
+id,kill_point,signal_sent_while_worker_down,result,recheckWindow,composeScript,deliver,compileVisit,statuses,correct,error,ms
+1,send,false,completed,1,1,1,1,accepted arrived completed,true,"",1675
+2,send,false,completed,1,1,1,1,accepted arrived completed,true,"",1629
+3,send,false,completed,1,1,1,1,accepted arrived completed,true,"",1675
+4,send,false,completed,1,1,1,1,accepted arrived completed,true,"",1614
+5,send,false,completed,1,1,1,1,accepted arrived completed,true,"",1640
+6,responded,false,completed,1,1,1,1,accepted arrived completed,true,"",1831
+7,responded,true,completed,1,1,1,1,accepted arrived completed,true,"",1621
+8,responded,false,completed,1,1,1,1,accepted arrived completed,true,"",1688
+9,responded,true,completed,1,1,1,1,accepted arrived completed,true,"",1639
+10,responded,false,completed,1,1,1,1,accepted arrived completed,true,"",1806
+11,arrived,false,completed,1,1,1,1,accepted arrived completed,true,"",1805
+12,arrived,true,completed,1,1,1,1,accepted arrived completed,true,"",1819
+13,arrived,false,completed,1,1,1,1,accepted arrived completed,true,"",1792
+14,arrived,true,completed,1,1,1,1,accepted arrived completed,true,"",1735
+15,arrived,false,completed,1,1,1,1,accepted arrived completed,true,"",1835
+16,visitEnded,false,completed,1,1,1,1,accepted arrived completed,true,"",1803
+17,visitEnded,true,completed,1,1,1,1,accepted arrived completed,true,"",1768
+18,visitEnded,false,completed,1,1,1,1,accepted arrived completed,true,"",1801
+19,visitEnded,true,completed,1,1,1,1,accepted arrived completed,true,"",1837
+20,visitEnded,false,completed,1,1,1,1,accepted arrived completed,true,"",1755
