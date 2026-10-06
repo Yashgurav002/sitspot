@@ -89,18 +89,31 @@ describe("custom LLM endpoint", () => {
   });
 
   it("finds the invitation from the system prompt or falls back to the open one; saves preferences with the quote", async () => {
-    jsonValue = { save_preference: { key: "avoid_hours", value: "morning", quote: "don't call me in the morning" } };
+    jsonValue = { save_preference: { key: "avoid_hours", value: { start: "06:00", end: "09:00" }, quote: "don't call me in the morning" } };
     const res = await llmReq({
       messages: [{ role: "system", content: `invitation_id: ${inv.id}` }, { role: "user", content: "please don't call me in the morning, I sleep late" }],
     });
     const json = (await res.json()) as any;
     expect(json).toMatchObject({ object: "chat.completion", choices: [{ message: { role: "assistant", content: REPLY }, finish_reason: "stop" }] });
     const prefs = await listPreferences(db, inv.user_id);
-    expect(prefs).toMatchObject([{ key: "avoid_hours", value: "morning", source_utterance: "don't call me in the morning" }]);
+    expect(prefs).toMatchObject([{ key: "avoid_hours", value: { start: "06:00", end: "09:00" }, source_utterance: "don't call me in the morning" }]);
 
     // No user message yet (agent's opener) and no id at all → stored script of the open invitation.
     const opener = (await (await llmReq({ messages: [{ role: "system", content: "hi" }] })).json()) as any;
     expect(opener.choices[0].message.content).toBe(inv.script);
+  });
+
+  it("drops a preference whose value has the wrong shape; normalises a bare spot name", async () => {
+    const say = async (utterance: string) =>
+      (await llmReq({ elevenlabs_extra_body: { invitation_id: inv.id }, messages: [{ role: "user", content: utterance }] })).json();
+    jsonValue = { save_preference: { key: "avoid_hours", value: "morning", quote: "not in the morning" } };
+    await say("not in the morning please");
+    jsonValue = { save_preference: { key: "spot_weekends_only", value: { spot: "" }, quote: "too far" } };
+    await say("it's too far");
+    expect(await listPreferences(db, inv.user_id)).toEqual([]);
+    jsonValue = { save_preference: { key: "spot_weekends_only", value: "Terrace", quote: "terrace only at weekends" } };
+    await say("terrace only at weekends");
+    expect(await listPreferences(db, inv.user_id)).toMatchObject([{ key: "spot_weekends_only", value: { spot: "Terrace" } }]);
   });
 
   it("builds facts for the context block", async () => {

@@ -1,10 +1,11 @@
 import { nextHighTide, nextLowTide, sunTimes, type TideRow } from "@sitspot/data";
 import {
-  countInvitationsSince, getConditions, getUser, lastDeclineAt, latestForecasts, listPreferences,
+  countInvitationsSince, getAcceptFactors, getConditions, getUser, lastDeclineAt, latestForecasts, listPreferences,
   listSpots, openInvitation, recentSightingsNear, type Db,
 } from "@sitspot/db";
 import { evaluateWindows, pickInvitation, type EvaluateInput, type TideEvent, type TideEvents } from "@sitspot/policy";
 import type { Candidate, Spot } from "@sitspot/shared";
+import { acceptFactorsByHour, buildRules } from "./memory";
 
 const HOUR = 3_600_000;
 const IST_MS = 5.5 * HOUR;
@@ -38,7 +39,8 @@ export async function buildEvaluateInput(db: Db, userId: string, now: Date): Pro
   const user = await getUser(db, userId);
   if (!user) throw new Error(`user ${userId} not found`);
   const spots = await listSpots(db, userId);
-  const loved = lovedNames(await listPreferences(db, userId));
+  const prefs = await listPreferences(db, userId);
+  const loved = lovedNames(prefs);
 
   const conditionsBySpot: EvaluateInput["conditionsBySpot"] = {};
   const forecastsBySpot: EvaluateInput["forecastsBySpot"] = {};
@@ -80,6 +82,8 @@ export async function buildEvaluateInput(db: Db, userId: string, now: Date): Pro
       lastDeclineAt: await lastDeclineAt(db, userId),
       hasOpenInvitation: (await openInvitation(db, userId)) !== null,
     },
+    acceptFactorByHour: acceptFactorsByHour(await getAcceptFactors(db, userId)),
+    rules: buildRules(prefs, spots),
   };
   return { input, threshold: user.threshold, spots };
 }
@@ -89,7 +93,7 @@ export async function evaluateForUser(
   db: Db,
   userId: string,
   now: Date,
-): Promise<{ candidates: Candidate[]; pick: Candidate | null; threshold: number }> {
+): Promise<{ candidates: (Candidate & { held?: string })[]; pick: Candidate | null; threshold: number }> {
   const { input, threshold } = await buildEvaluateInput(db, userId, now);
   const candidates = evaluateWindows(input);
   return { candidates, pick: pickInvitation(candidates, threshold, now), threshold };

@@ -57,6 +57,16 @@ export async function updateUserSettings(
   );
 }
 
+/** Learned accept factor per local hour (written by nightly reflect); {} when none yet. */
+export async function getAcceptFactors(db: Db, id: string): Promise<Record<string, number>> {
+  const r = one(await db.query<{ f: Record<string, number> | null }>(`select accept_factors as f from users where id = $1`, [id]));
+  return r?.f ?? {};
+}
+
+export async function setAcceptFactors(db: Db, id: string, f: Record<string, number>): Promise<void> {
+  await db.query(`update users set accept_factors = $2::text::jsonb where id = $1`, [id, json(f)]);
+}
+
 export async function setPushSubscription(db: Db, id: string, sub: unknown): Promise<void> {
   await db.query(`update users set push_subscription = $2::text::jsonb where id = $1`, [id, json(sub)]);
 }
@@ -415,12 +425,19 @@ export async function logAgentRun(
     tokens_out?: number | null;
     latency_ms?: number | null;
     trace_id?: string | null;
+    summary?: unknown;
   },
 ): Promise<string> {
   const rows = await db.query<{ id: string }>(
-    `insert into agent_runs (invitation_id, kind, model, tokens_in, tokens_out, latency_ms, trace_id)
-     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
-    [r.invitation_id ?? null, r.kind, r.model, r.tokens_in ?? null, r.tokens_out ?? null, r.latency_ms ?? null, r.trace_id ?? null],
+    `insert into agent_runs (invitation_id, kind, model, tokens_in, tokens_out, latency_ms, trace_id, summary)
+     values ($1,$2,$3,$4,$5,$6,$7,$8::text::jsonb) returning id`,
+    [r.invitation_id ?? null, r.kind, r.model, r.tokens_in ?? null, r.tokens_out ?? null, r.latency_ms ?? null,
+      r.trace_id ?? null, r.summary === undefined ? null : json(r.summary)],
   );
   return rows[0]!.id;
+}
+
+export async function findAgentRun(db: Db, kind: string, traceId: string): Promise<{ id: string; summary: unknown } | null> {
+  return one(await db.query<{ id: string; summary: unknown }>(
+    `select id, summary from agent_runs where kind = $1 and trace_id = $2 order by created_at limit 1`, [kind, traceId]));
 }

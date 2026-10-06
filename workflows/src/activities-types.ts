@@ -23,7 +23,7 @@ export interface Activities {
   evaluateWindows(userId: string): Promise<PickDTO | null>;
   /** Idempotent on (user, spot, window_start): returns the existing row if present. */
   createInvitation(userId: string, pick: PickDTO, workflowId: string): Promise<{ invitationId: string; created: boolean }>;
-  /** Nightly reflection (T13 fills in threshold nudge / accept factors). */
+  /** Nightly reflection ( threshold nudge / accept factors). */
   reflect(userId: string): Promise<void>;
   /** Re-score this spot/window with fresh conditions. */
   recheckWindow(invitationId: string): Promise<{ ok: boolean; reason: string }>;

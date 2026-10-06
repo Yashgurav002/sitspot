@@ -13,6 +13,7 @@ import {
 } from "@sitspot/shared";
 import { safeEqual, sign, verify } from "./auth";
 import { evaluateForUser } from "./services/evaluate";
+import { parsePreferenceValue } from "./services/memory";
 import { pullAll } from "./services/pull";
 import { mcpHandler } from "./mcp";
 import { llmFromEnv, type Llm } from "@sitspot/llm";
@@ -393,7 +394,9 @@ export function createApp(deps: AppDeps) {
 
   app.post("/v1/memory/preferences", async (c) => {
     const p = await body(c, PreferenceInput.extend({ source_utterance: z.string().trim().min(1, "source_utterance required") }));
-    return c.json({ preference: await q.addPreference(db, c.var.uid, p) }, 201);
+    const v = parsePreferenceValue(p.key, p.value);
+    if (!v.ok) throw bad(v.error);
+    return c.json({ preference: await q.addPreference(db, c.var.uid, { ...p, value: v.value }) }, 201);
   });
 
   app.delete("/v1/memory/preferences/:id", async (c) => {

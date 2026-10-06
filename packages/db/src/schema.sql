@@ -149,3 +149,8 @@ create table if not exists agent_runs (
   trace_id text,
   created_at timestamptz not null default now()
 );
+
+-- T13 memory: learned per-IST-hour accept factors ({"7": 1.2, ...}, 0.5..1.5) written by nightly reflect,
+-- and a free-form summary on agent_runs (reflect writes kind 'reflect', trace_id 'reflect:<user>:<day>').
+alter table users add column if not exists accept_factors jsonb;
+alter table agent_runs add column if not exists summary jsonb;

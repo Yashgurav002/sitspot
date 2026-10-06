@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Candidate, ConditionsHour, Factors, SunTimes } from "@sitspot/shared";
 import {
   CONFIG, availability, comfort, coastalSafetyLine, evaluateWindows, hhmm, lightBonus, novelty,
-  overlapsQuietHours, parseClock, pickInvitation, requiresSafetyLine, safetyCheck, score, sendAt,
+  isLocalWeekend, memoryHold, overlapsQuietHours, parseClock, pickInvitation, requiresSafetyLine, safetyCheck, score, sendAt,
   tideFit, tideStateAt, type EvaluateInput, type SafetyInput,
 } from "../src/index.js";
 
@@ -326,4 +326,41 @@ describe("pickInvitation", () => {
     expect(pickInvitation([mk({ score: 0.5 }), mk({ score: 0.9, spot_id: CREEK })], 0.35, now)!.spot_id).toBe(CREEK);
   });
   it("default threshold constant", () => expect(CONFIG.defaultThreshold).toBe(0.35));
+});
+
+describe("memory rules (spec §3.7)", () => {
+  const QUOTE = "the creek is too far on weekdays";
+  const rules = { weekendsOnlySpotIds: [CREEK], rule_notes: { [`weekends_only:${CREEK}`]: QUOTE } };
+  it("isLocalWeekend uses the IST weekday, not UTC", () => {
+    expect(isLocalWeekend(ist("2026-10-09T23:30"))).toBe(false); // Fri IST
+    expect(isLocalWeekend(ist("2026-10-10T00:30"))).toBe(true); // Sat IST = Fri 19:00 UTC
+    expect(isLocalWeekend(ist("2026-10-11T23:30"))).toBe(true); // Sun IST
+    expect(isLocalWeekend(ist("2026-10-12T00:30"))).toBe(false); // Mon IST = Sun 19:00 UTC
+    expect(isLocalWeekend(ist("2026-10-10T00:30"), "UTC")).toBe(false);
+  });
+  it("weekends-only spot: held on a weekday with the quote, free on Saturday", () => {
+    const wed = evaluateWindows(input({ now: at("12:05", "2026-10-07"), rules }));
+    const creek = wed.filter((x) => x.spot_id === CREEK);
+    expect(creek.every((x) => x.factors.availability === 0 && x.score === 0)).toBe(true);
+    expect(creek[0]!.held).toBe(`weekends only (you said: "${QUOTE}")`);
+    expect(creek[0]!.reason).toMatch(/^Held back: weekends only \(you said: "the creek is too far on weekdays"\)\. /);
+    expect(wed.filter((x) => x.spot_id === PARK).every((x) => !x.held && x.factors.availability === 1)).toBe(true);
+    const sat = evaluateWindows(input({ now: at("12:05", "2026-10-10"), rules }));
+    expect(sat.filter((x) => x.spot_id === CREEK).every((x) => !x.held)).toBe(true);
+    expect(pickInvitation(wed, 0.35, at("12:05", "2026-10-07"))?.spot_id).not.toBe(CREEK);
+  });
+  it("avoided spot is always held", () => {
+    const c = evaluateWindows(input({ rules: { avoidSpotIds: [PARK], rule_notes: { [`avoid:${PARK}`]: "skip the park" } } }));
+    const park = c.filter((x) => x.spot_id === PARK);
+    expect(park.every((x) => x.factors.availability === 0)).toBe(true);
+    expect(park[0]!.held).toBe('you asked to avoid this spot (you said: "skip the park")');
+  });
+  it("avoid hours hold overlapping windows only (wraps midnight too)", () => {
+    const c = evaluateWindows(input({ rules: { avoidHours: [{ start: "14:30", end: "16:00" }] } }));
+    const held = [...new Set(c.filter((x) => x.held).map((x) => hhmm(x.window_start)))].sort();
+    expect(held).toEqual(["14:00", "15:00"]);
+    expect(c.find((x) => x.held)!.held).toBe("you avoid 14:30–16:00");
+    expect(memoryHold(PARK, ist("2026-10-06T23:00"), ist("2026-10-07T00:00"), { avoidHours: [{ start: "23:30", end: "01:00" }] })).toMatch(/avoid/);
+    expect(memoryHold(PARK, at("13:00"), at("14:00"), undefined)).toBeNull();
+  });
 });

@@ -54,6 +54,19 @@ export function localHour(d: Date, tz: string = TIMEZONE): number {
   return localHMS(d, tz).h;
 }
 
+const dows = new Map<string, Intl.DateTimeFormat>();
+/** Saturday or Sunday in `tz` (falls back to IST for an unknown tz). */
+export function isLocalWeekend(d: Date, tz: string = TIMEZONE): boolean {
+  let f = dows.get(tz);
+  if (!f) {
+    try { f = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }); }
+    catch { f = new Intl.DateTimeFormat("en-US", { timeZone: TIMEZONE, weekday: "short" }); }
+    dows.set(tz, f);
+  }
+  const w = f.format(d);
+  return w === "Sat" || w === "Sun";
+}
+
 /** "HH:MM" in `tz`. */
 export function hhmm(d: Date, tz: string = TIMEZONE): string {
   const { h, m } = localHMS(d, tz);
@@ -254,6 +267,36 @@ export function tideStateAt(t: Date, ev: TideEvents | null | undefined): TideSta
   return { trend: falling ? "falling" : "rising", hoursToLow: dist(lows) / HOUR, minutesToNearestHigh: dist(highs) / MIN };
 }
 
+/**
+ * Long-term memory rules built from the user's preferences (spec §3.7). Any match sets availability to 0.
+ * `rule_notes` maps a rule key to the user's own words: `weekends_only:<spotId>`, `avoid:<spotId>`,
+ * `avoid_hours:<HH:MM>-<HH:MM>`.
+ */
+export type MemoryRules = {
+  weekendsOnlySpotIds?: string[];
+  avoidSpotIds?: string[];
+  avoidHours?: { start: string; end: string }[];
+  rule_notes?: Record<string, string>;
+};
+
+/** Why memory holds this window back ("weekends only (you said: \"…\")"), or null. */
+export function memoryHold(
+  spotId: string, window_start: Date, window_end: Date, rules: MemoryRules | undefined, tz: string = TIMEZONE,
+): string | null {
+  if (!rules) return null;
+  const said = (k: string) => (rules.rule_notes?.[k] ? ` (you said: "${rules.rule_notes[k]}")` : "");
+  if (rules.avoidSpotIds?.includes(spotId)) return `you asked to avoid this spot${said(`avoid:${spotId}`)}`;
+  if (rules.weekendsOnlySpotIds?.includes(spotId) && !isLocalWeekend(window_start, tz))
+    return `weekends only${said(`weekends_only:${spotId}`)}`;
+  for (const h of rules.avoidHours ?? [])
+    if (overlapsQuietHours(window_start, window_end, h.start, h.end, tz))
+      return `you avoid ${h.start}–${h.end}${said(`avoid_hours:${h.start}-${h.end}`)}`;
+  return null;
+}
+
+/** A scored window; `held` is set when a memory rule zeroed availability. */
+export type PolicyCandidate = Candidate & { held?: string };
+
 export type EvaluateInput = {
   now: Date;
   user: Pick<User, "quiet_start" | "quiet_end" | "timezone"> & Partial<Pick<User, "threshold">>;
@@ -267,6 +310,7 @@ export type EvaluateInput = {
   lovedSightingsBySpot?: Record<string, number>;
   history: History;
   acceptFactorByHour?: AcceptFactorByHour;
+  rules?: MemoryRules;
 };
 
 /** Row whose time is closest to t (strictly within 60 min), or null. Later rows win ties. */
@@ -287,10 +331,10 @@ function firstWindowStart(now: Date, tz: string): Date {
 }
 
 /** Every spot × next 6 hourly windows, scored, sorted by score desc (ties: earlier, then spot id). */
-export function evaluateWindows(input: EvaluateInput): Candidate[] {
+export function evaluateWindows(input: EvaluateInput): PolicyCandidate[] {
   const tz = input.user.timezone || TIMEZONE;
   const first = firstWindowStart(input.now, tz);
-  const out: Candidate[] = [];
+  const out: PolicyCandidate[] = [];
   for (const spot of input.spots) {
     for (let k = 0; k < CONFIG.horizonHours; k++) {
       const window_start = new Date(first.getTime() + k * HOUR);
@@ -306,6 +350,7 @@ export function evaluateWindows(input: EvaluateInput): Candidate[] {
       const apparent = fin(cond?.apparent_c) ? cond!.apparent_c : fin(cond?.temp_c) ? cond!.temp_c : null;
       const aqi = cond?.us_aqi ?? null;
       const p_ok = fc && fin(fc.p_rich);
+      const held = memoryHold(spot.id, window_start, window_end, input.rules, tz);
       const factors: Factors = {
         p_rich: p_ok ? clamp(fc.p_rich, 0, 1) : CONFIG.prior.p_rich,
         p_rich_model: p_ok ? fc.model_version : CONFIG.prior.model,
@@ -313,7 +358,7 @@ export function evaluateWindows(input: EvaluateInput): Candidate[] {
         tide_fit: tideFit(spot.kind, tideStateAt(mid, tides)),
         light_bonus: lightBonus(window_start, sun),
         novelty: novelty(loved),
-        availability: availability({
+        availability: held ? 0 : availability({
           ...input.history, now: input.now, window_start, window_end, send_at,
           quiet_start: input.user.quiet_start, quiet_end: input.user.quiet_end, timezone: tz,
           acceptFactorByHour: input.acceptFactorByHour,
@@ -325,11 +370,13 @@ export function evaluateWindows(input: EvaluateInput): Candidate[] {
         apparent_c: apparent, us_aqi: aqi,
         quiet_start: input.user.quiet_start, quiet_end: input.user.quiet_end, timezone: tz,
       });
+      const reason = reasonFor(spot.kind, mid, apparent, aqi, sun, window_start, window_end, tides, loved, factors, tz);
       out.push({
         spot_id: spot.id, window_start, window_end, send_at,
         score: score(factors), factors,
-        reason: reasonFor(spot.kind, mid, apparent, aqi, sun, window_start, window_end, tides, loved, factors, tz),
+        reason: held ? `Held back: ${held}. ${reason}` : reason,
         safe: safety.ok, blocked_by: safety.blocked_by,
+        ...(held && { held }),
       });
     }
   }

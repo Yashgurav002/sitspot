@@ -5,6 +5,7 @@ import { chatTurnStream, extractIntent, type ChatResult, type InvitationFacts } 
 import * as q from "@sitspot/db";
 import type { Message } from "@sitspot/llm";
 import type { Invitation } from "@sitspot/shared";
+import { parsePreferenceValue } from "../services/memory";
 import { buildInvitationFacts } from "./facts";
 import type { VoiceDeps } from "./index";
 
@@ -53,7 +54,9 @@ async function applyIntent(d: VoiceDeps, inv: Invitation, utterance: string, las
   }
   if (intent.save_preference) {
     const p = intent.save_preference;
-    await q.addPreference(d.db, inv.user_id, { key: p.key, value: p.value, source_utterance: p.quote });
+    const v = parsePreferenceValue(p.key, p.value);
+    if (!v.ok) console.warn(`[voice] dropped preference: ${v.error}`);
+    else await q.addPreference(d.db, inv.user_id, { key: p.key, value: v.value, source_utterance: p.quote });
   }
 }
 

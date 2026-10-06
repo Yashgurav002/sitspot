@@ -10,6 +10,7 @@ import { CONFIG, evaluateWindows } from "@sitspot/policy";
 import type { Candidate, Factors, Invitation } from "@sitspot/shared";
 import type { Activities, PickDTO } from "@sitspot/workflows";
 import { buildEvaluateInput, evaluateForUser, istMidnight, tideEvents } from "./services/evaluate";
+import { reflectForUser } from "./services/memory";
 
 const HOUR = 3_600_000;
 const SIGHTING_KM = 3; // the context block says "≤3 km"
@@ -129,9 +130,9 @@ export function createActivities(deps: ActivityDeps): Activities {
     },
 
     async reflect(userId) {
-      // T13: threshold nudge + per-hour accept factors. For now just a log line.
-      const n = await q.countInvitationsSince(db, userId, new Date(istMidnight(now()).getTime() - 24 * HOUR));
-      console.log(`[reflect] user ${userId}: ${n} invitation(s) since yesterday`);
+      if (!(await q.getUser(db, userId))) throw invalid(`user ${userId} not found`);
+      const s = await reflectForUser(db, userId, now());
+      console.log(`[reflect] user ${userId} ${s.day}: threshold ${s.threshold_before} -> ${s.threshold_after}, ${s.responded} responded`);
     },
 
     async recheckWindow(invitationId) {
