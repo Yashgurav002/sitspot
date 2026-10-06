@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "suncalc": "^2.1.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.5",
+    "@sitspot/shared": "workspace:*"
   },
   "devDependencies": {
     "@types/suncalc": "^1.9.2"
