@@ -1,0 +1,9 @@
+# torch CPU wheel: pip install torch --index-url https://download.pytorch.org/whl/cpu  (before the rest)
+tabpfn
+pandas
+numpy
+scikit-learn
+xgboost
+requests
+psycopg[binary]
+pytest
