@@ -61,6 +61,41 @@ export function mergeSystemMessages(messages: Message[]): Message[] {
   return rest.map((m, j) => (j === i ? { role: 'user', content: `${prefix}\n\n${m.content}` } : m));
 }
 
+const THINK = /^\s*<(thought|think)>[\s\S]*?<\/(?:thought|think)>\s*/;
+
+/** Drop a leading <thought>…</thought> / <think>…</think> block (Gemma 4 on AI Studio can't turn thinking off). */
+export function stripThinking(text: string): string {
+  return text.replace(THINK, '');
+}
+
+/** Streaming version: hides a leading thinking block, passes everything else through. */
+export function thinkingFilter(): (delta: string) => string {
+  let buf = '';
+  let state: 'pending' | 'inside' | 'out' = 'pending';
+  return (delta) => {
+    if (state === 'out') return delta;
+    buf += delta;
+    if (state === 'pending') {
+      const t = buf.trimStart();
+      const open = ['<thought>', '<think>'].find((o) => t.startsWith(o));
+      if (!open) {
+        if (['<thought>', '<think>'].some((o) => o.startsWith(t))) return ''; // could still become a tag
+        state = 'out';
+        const out = buf;
+        buf = '';
+        return out;
+      }
+      state = 'inside';
+    }
+    const m = buf.match(/<\/(thought|think)>\s*/);
+    if (!m || m.index === undefined) return '';
+    state = 'out';
+    const out = buf.slice(m.index + m[0].length);
+    buf = '';
+    return out;
+  };
+}
+
 /** First balanced {...} in text (handles ```json fences and prose around it). */
 export function extractJson(text: string): string | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -127,7 +162,7 @@ export function createLlm(cfg: LlmConfig): Llm {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     return {
-      text: data.choices?.[0]?.message?.content ?? '',
+      text: stripThinking(data.choices?.[0]?.message?.content ?? ''),
       usage: data.usage
         ? { tokens_in: data.usage.prompt_tokens ?? 0, tokens_out: data.usage.completion_tokens ?? 0 }
         : null,
@@ -146,6 +181,7 @@ export function createLlm(cfg: LlmConfig): Llm {
       if (!res.body) return;
       const decoder = new TextDecoder();
       let buf = '';
+      const unthink = thinkingFilter();
       for await (const chunk of res.body as unknown as AsyncIterable<Uint8Array>) {
         buf += decoder.decode(chunk, { stream: true });
         let nl: number;
@@ -157,7 +193,8 @@ export function createLlm(cfg: LlmConfig): Llm {
           if (payload === '[DONE]') return;
           try {
             const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
-            if (delta) yield delta as string;
+            const out = delta ? unthink(delta as string) : '';
+            if (out) yield out;
           } catch {
             // ponytail: skip malformed SSE lines rather than kill the stream
           }
@@ -203,11 +240,16 @@ export function llmFromEnv(kind: LlmKind, env: Record<string, string | undefined
   const e = (k: string) => env[k]?.trim() || undefined;
   const mainBase = e('LLM_BASE_URL') ?? OLLAMA_BASE_URL;
   const key = e('LLM_API_KEY');
+  // Scripts and notes are written ahead of time, so a slow thinking model (Gemma 4) is fine there.
+  const slowTimeout = Number(e('LLM_TIMEOUT_MS') ?? 180_000);
   switch (kind) {
-    case 'chat':
-      return createLlm({ baseUrl: mainBase, apiKey: key, model: e('LLM_MODEL_CHAT') ?? 'gemma3:1b' });
+    case 'chat': {
+      // Voice turns need low latency: CHAT_LLM_BASE_URL can point at local Ollama (no hosted key sent).
+      const chatBase = e('CHAT_LLM_BASE_URL');
+      return createLlm({ baseUrl: chatBase ?? mainBase, apiKey: chatBase ? undefined : key, model: e('LLM_MODEL_CHAT') ?? 'gemma3:1b' });
+    }
     case 'script':
-      return createLlm({ baseUrl: mainBase, apiKey: key, model: e('LLM_MODEL_SCRIPT') ?? 'gemma3:4b' });
+      return createLlm({ baseUrl: mainBase, apiKey: key, model: e('LLM_MODEL_SCRIPT') ?? 'gemma3:4b', timeoutMs: slowTimeout });
     case 'note': {
       // A separate NOTE_LLM_BASE_URL is local Ollama — don't leak the hosted key to it.
       const noteBase = e('NOTE_LLM_BASE_URL');
@@ -215,6 +257,7 @@ export function llmFromEnv(kind: LlmKind, env: Record<string, string | undefined
         baseUrl: noteBase ?? mainBase,
         apiKey: noteBase ? undefined : key,
         model: e('LLM_MODEL_NOTE') ?? 'gemma3:4b',
+        timeoutMs: slowTimeout,
       });
     }
     case 'embed': {

@@ -6,7 +6,7 @@ import { creek } from './fixtures.js';
 
 describe.skipIf(!process.env.LIVE)('LIVE Ollama composeScript', () => {
   it('passes validators or falls back', { timeout: 300_000 }, async () => {
-    const llm = createLlm({ baseUrl: OLLAMA_BASE_URL, model: process.env.LIVE_MODEL ?? 'gemma3:1b', timeoutMs: 120_000 });
+    const llm = createLlm({ baseUrl: process.env.LIVE_BASE_URL ?? OLLAMA_BASE_URL, apiKey: process.env.LIVE_API_KEY, model: process.env.LIVE_MODEL ?? 'gemma3:1b', timeoutMs: 120_000 });
     const r = await composeScript(llm, creek);
     console.log(JSON.stringify(r, null, 2));
     if (r.meta.fallback) expect(r.script).toBe(templateScript(creek).script);

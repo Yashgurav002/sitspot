@@ -195,3 +195,21 @@ describe.skipIf(!process.env.LIVE)('LIVE Ollama', () => {
     expect(v[0]!.length).toBeGreaterThan(100);
   }, 120_000);
 });
+
+import { stripThinking, thinkingFilter } from '../src/index';
+
+describe('thinking blocks (Gemma 4)', () => {
+  it('strips a leading thought block', () => {
+    expect(stripThinking('<thought>plan {"a":1}</thought>\n{"reply":"hi"}')).toBe('{"reply":"hi"}');
+    expect(stripThinking('no thoughts here')).toBe('no thoughts here');
+  });
+  it('filters a thought block split across stream deltas', () => {
+    const f = thinkingFilter();
+    const out = ['<tho', 'ught>secret', ' stuff</tho', 'ught>\nHel', 'lo'].map(f).join('');
+    expect(out).toBe('Hello');
+  });
+  it('passes through streams without thinking', () => {
+    const f = thinkingFilter();
+    expect(['<b', 'old> hi'].map(f).join('')).toBe('<bold> hi');
+  });
+});
