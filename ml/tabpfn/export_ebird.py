@@ -26,9 +26,8 @@ import requests
 HERE = Path(__file__).resolve().parent
 CACHE = HERE / "cache"
 EBIRD = "https://api.ebird.org/v2"
-# IN-MH-PG (Palghar) and IN-MH-MC (Mumbai City) seen on ebird.org; IN-MH-MS (Mumbai Suburban)
-# and IN-MH-TN (Thane) are [verify] -> run `--list-regions IN-MH` once the key exists.
-DEFAULT_REGIONS = "IN-MH-PG,IN-MH-TN,IN-MH-MC,IN-MH-MS"
+# Verified 2026-10-06 via `--list-regions IN-MH`: Palghar, Thane, Mumbai City, Mumbai Suburban.
+DEFAULT_REGIONS = "IN-MH-PG,IN-MH-TH,IN-MH-MC,IN-MH-MS"
 PROTOCOLS = {"P21": "stationary", "P22": "traveling"}
 COLUMNS = ["checklist_id", "loc_id", "lat", "lon", "obs_time", "duration_min", "protocol",
            "num_species", "all_obs_reported", "region"]

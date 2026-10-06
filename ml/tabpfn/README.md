@@ -27,7 +27,7 @@ python -m venv .venv
 
 ## Data notes (checked 2026-10-06)
 
-- **eBird region codes:** `IN-MH-PG` (Palghar) and `IN-MH-MC` (Mumbai City) appear on ebird.org. `IN-MH-MS` (Mumbai Suburban) and `IN-MH-TN` (Thane) are **[verify]**. Once you have the key, run `python export_ebird.py --list-regions IN-MH` and fix `--regions` if needed.
+- **eBird region codes (verified 2026-10-06):** `IN-MH-PG` Palghar, `IN-MH-TH` Thane, `IN-MH-MC` Mumbai City, `IN-MH-MS` Mumbai Suburban.
 - Checklists at personal (non-hotspot) locations are dropped when the feed has no coordinates. The API does not expose them.
 - `num_species` is eBird's feed `numSpecies` (fallback: distinct `speciesCode` in the checklist, which can include spuh/slash taxa).
 - Only complete checklists (`allObsReported`) with stationary/traveling protocol and 15–120 min duration are kept.
