@@ -1,6 +1,6 @@
 // Run the browser BirdNET model (same model.ts the Web Worker uses) on a real clip in Node, CPU backend.
 // Usage: node ml/birdnet-web/run_node.mjs <audio file> [lat lon]
-// Needs ffmpeg on PATH (decodes to 48 kHz mono f32) and models from fetch_model.py.
+// Needs ffmpeg on PATH (decodes to 48 kHz mono f32) and models from fetch_model.mjs.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

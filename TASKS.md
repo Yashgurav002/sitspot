@@ -29,7 +29,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 - Learned per-hour accept factors stored in `users.accept_factors` (not preferences — those must be the user's own words).
 - Credits needed in README/DEV post: TabPFN by Prior Labs; BirdNET (Kahl et al. 2021, CC BY-NC-SA 4.0).
 
-**Known gaps / before going public:** login rate limit; strong ADMIN_PASSCODE set only in host env; `COOKIE_CROSS_SITE=1` (or proxy) when web and API are on different sites; BirdNET + battery untested on a real phone (needs HTTPS).
+**Known gaps / before going public:** strong ADMIN_PASSCODE set only in host env (login now rate-limited, 5 fails/IP/15 min); hosting = web on Vercel (proxy `/api` → ngrok) + laptop `pnpm start --tunnel --no-web` (docs/setup.md §11); BirdNET + battery untested on a real phone (needs HTTPS).
 
 **Run locally:** start Temporal (above) → `pnpm --filter @sitspot/api start` (:8787) → `pnpm --filter @sitspot/web dev` (:3000) → sign in with `ADMIN_PASSCODE`. Tests: `pnpm -r test`.
 

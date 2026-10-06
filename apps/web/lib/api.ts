@@ -1,5 +1,6 @@
-// Typed client for apps/api (spec §8). Cookie session lives on the API origin, so every call
-// runs in the browser with credentials: 'include'.
+// Typed client for apps/api (spec §8). Default base is /api on this origin (app/api/[...path]/route.ts proxies it to
+// the API), so the session cookie is first-party. NEXT_PUBLIC_API_URL points at a separate API origin
+// instead (then the API needs WEB_ORIGIN + COOKIE_CROSS_SITE=1). credentials: 'include' covers both.
 import type {
   ConditionsHour, DetectionInput, FieldNote, Forecast, Invitation, InvitationStatus, Preference, Spot, SpotInput, User, Visit,
 } from "@sitspot/shared";
@@ -13,7 +14,7 @@ export type Wire<T> = T extends Date
       ? { [K in keyof T]: Wire<T[K]> }
       : T;
 
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

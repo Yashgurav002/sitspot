@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const API = "http://localhost:8787";
+const API = "http://localhost:3100/api"; // same-origin proxy (next.config.ts rewrites)
 
 test("sign in → add spot → see it listed", async ({ page }) => {
   let authed = false;
@@ -9,7 +9,7 @@ test("sign in → add spot → see it listed", async ({ page }) => {
   await page.route("https://tile.openstreetmap.org/**", (r) => r.abort());
   await page.route(`${API}/**`, async (route) => {
     const req = route.request();
-    const path = new URL(req.url()).pathname;
+    const path = new URL(req.url()).pathname.replace(/^\/api/, "");
     const json = (status: number, body: unknown) => route.fulfill({ status, json: body });
     if (path === "/auth/login") {
       authed = req.postDataJSON().passcode === "letmein";

@@ -14,7 +14,7 @@ describe("request", () => {
     const fn = mockFetch(200, '{"ok":true}');
     await expect(request("/x", { method: "POST", json: { a: 1 } })).resolves.toEqual({ ok: true });
     const [url, init] = fn.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe("http://localhost:8787/x");
+    expect(url).toBe("/api/x");
     expect(init.credentials).toBe("include");
     expect(init.body).toBe('{"a":1}');
     expect((init.headers as Record<string, string>)["content-type"]).toBe("application/json");
@@ -50,6 +50,6 @@ describe("request", () => {
   it("encodes search queries", async () => {
     const fn = mockFetch(200, "[]");
     await api.searchNotes("egrets & tide");
-    expect((fn.mock.calls[0] as unknown as [string])[0]).toBe("http://localhost:8787/v1/notes/search?q=egrets%20%26%20tide");
+    expect((fn.mock.calls[0] as unknown as [string])[0]).toBe("/api/v1/notes/search?q=egrets%20%26%20tide");
   });
 });

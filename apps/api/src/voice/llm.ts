@@ -124,7 +124,7 @@ export async function chatCompletions(c: Context, d: VoiceDeps) {
   const chunk = (delta: Record<string, string>, finish_reason: string | null = null) =>
     `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason }] })}\n\n`;
   c.header("content-type", "text/event-stream");
-  c.header("cache-control", "no-cache");
+  c.header("cache-control", "no-cache, no-transform"); // no-transform: proxies/tunnels must not gzip-buffer the stream
   return stream(c, async (s) => {
     await s.write(chunk({ role: "assistant", content: "" }));
     for await (const t of chunks) await s.write(chunk({ content: t }));

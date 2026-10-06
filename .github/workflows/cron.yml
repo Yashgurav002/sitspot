@@ -1,8 +1,10 @@
 name: cron
+# Laptop hosting: secrets API_URL=https://<NGROK_DOMAIN> (ngrok -> API :8787), WEB_URL=https://<app>.vercel.app. GitHub can only reach the
+# laptop through the tunnel; scripts/hourly.mjs (started by `pnpm start`) does the pull + forecast locally anyway.
 # GitHub cron: UTC, minimum 5-minute interval, runs can be late. Each `if:` must match its cron string exactly.
 on:
   schedule:
-    - cron: "*/10 * * * *" # keep-alive (Render free tier sleeps after 15 min idle)
+    - cron: "*/10 * * * *" # keep-alive (Render free tier sleeps after 15 min idle; harmless on the laptop)
     - cron: "5 * * * *" # hourly data pull
     - cron: "15 * * * *" # hourly TabPFN forecast
   workflow_dispatch: {}
@@ -48,15 +50,23 @@ jobs:
     if: ${{ always() && (github.event.schedule == '15 * * * *' || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # API mode (laptop + ngrok, PGlite): API_URL = https://<NGROK_DOMAIN> and CRON_SECRET; reads input from
+    # /cron/forecast-input and POSTs to /cron/forecast-ingest. Needs the training CSV committed at
+    # ml/tabpfn/training.csv (cache/ is gitignored). The laptop runs the same job itself (scripts/hourly.mjs),
+    # so this is only a backup and only works while the laptop and tunnel are up.
+    # DB mode: DATABASE_URL (Postgres) instead.
     env:
+      API_URL: ${{ secrets.API_URL }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
     steps:
-      - name: Check DATABASE_URL
+      - uses: actions/checkout@v4
+      - name: Pick mode
         id: gate
         run: |
-          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret not set; skipping"; echo "run=false" >> "$GITHUB_OUTPUT"; else echo "run=true" >> "$GITHUB_OUTPUT"; fi
-      - if: steps.gate.outputs.run == 'true'
-        uses: actions/checkout@v4
+          if [ -n "$API_URL" ] && [ -n "$CRON_SECRET" ] && [ -f ml/tabpfn/training.csv ]; then echo "args=--api $API_URL --train ml/tabpfn/training.csv" >> "$GITHUB_OUTPUT"; echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$DATABASE_URL" ]; then echo "args=" >> "$GITHUB_OUTPUT"; echo "run=true" >> "$GITHUB_OUTPUT"
+          else echo "Neither API_URL+CRON_SECRET+ml/tabpfn/training.csv nor DATABASE_URL; skipping"; echo "run=false" >> "$GITHUB_OUTPUT"; fi
       - if: steps.gate.outputs.run == 'true'
         uses: actions/setup-python@v5
         with:
@@ -66,4 +76,4 @@ jobs:
       - if: steps.gate.outputs.run == 'true'
         run: pip install -r ml/tabpfn/requirements.txt
       - if: steps.gate.outputs.run == 'true'
-        run: python ml/tabpfn/forecast_job.py
+        run: python ml/tabpfn/forecast_job.py ${{ steps.gate.outputs.args }}

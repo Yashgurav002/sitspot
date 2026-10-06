@@ -102,6 +102,41 @@ describe("health + auth", () => {
     expect(r.headers.get("set-cookie")).toMatch(/Secure/i);
   });
 
+  it("login rate limit: 5 wrong passcodes per IP per 15 min -> 429, keyed on the last x-forwarded-for hop", async () => {
+    let t = NOW.getTime();
+    const a = createApp({ db, env: ENV, now: () => new Date(t) });
+    const login = (passcode: string, xff?: string) => a.request("/auth/login", {
+      method: "POST", body: JSON.stringify({ passcode }),
+      headers: { "content-type": "application/json", ...(xff && { "x-forwarded-for": xff }) },
+    });
+    for (let i = 0; i < 5; i++) expect((await login("nope", "6.6.6.6")).status).toBe(401);
+    const blocked = await login("letmein", "6.6.6.6");
+    expect(blocked.status).toBe(429); // even the right passcode
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+    expect((await login("letmein", "1.2.3.4, 6.6.6.6")).status).toBe(429); // spoofed first hop doesn't escape
+    expect((await login("letmein", "7.7.7.7")).status).toBe(200); // other IPs unaffected
+    expect((await login("letmein")).status).toBe(200); // no header -> "local" bucket
+    t += 15 * 60_000 + 1;
+    expect((await login("letmein", "6.6.6.6")).status).toBe(200); // window over
+    for (let i = 0; i < 4; i++) await login("nope", "6.6.6.6");
+    await login("letmein", "6.6.6.6"); // success clears the count
+    for (let i = 0; i < 4; i++) expect((await login("nope", "6.6.6.6")).status).toBe(401);
+  });
+
+  it("login rate limit trusts x-sitspot-client-ip only with the right PROXY_SECRET", async () => {
+    const a = createApp({ db, env: { ...ENV, PROXY_SECRET: "px" }, now: () => NOW });
+    const login = (passcode: string, h: Record<string, string>) => a.request("/auth/login", {
+      method: "POST", body: JSON.stringify({ passcode }),
+      headers: { "content-type": "application/json", "x-forwarded-for": "76.76.21.21", ...h },
+    });
+    const viaProxy = (ip: string) => ({ "x-sitspot-proxy-secret": "px", "x-sitspot-client-ip": ip });
+    for (let i = 0; i < 5; i++) await login("nope", viaProxy("6.6.6.6"));
+    expect((await login("letmein", viaProxy("6.6.6.6"))).status).toBe(429);
+    expect((await login("letmein", viaProxy("7.7.7.7"))).status).toBe(200); // same proxy egress IP, other client
+    for (let i = 0; i < 5; i++) await login("nope", { "x-sitspot-proxy-secret": "wrong", "x-sitspot-client-ip": `9.9.9.${i}` });
+    expect((await login("letmein", {})).status).toBe(429); // bad secret -> keyed on the x-forwarded-for hop
+  });
+
   it("demo session is read-only", async () => {
     const { res, json } = await req("/auth/demo", { method: "POST" });
     expect(json.demo).toBe(true);
@@ -205,6 +240,23 @@ describe("cron + conditions + candidates", () => {
     expect(creekC).toHaveLength(6);
     expect(creekC[0].reason).toMatch(/tide/);
     expect("pick" in k.json).toBe(true);
+  });
+
+  it("forecast-input: secret required, spots + conditions for now-1h..now+hours+1h", async () => {
+    const cookie = await login();
+    const creek = (await req("/v1/spots", { cookie, body: CREEK })).json;
+    await req("/cron/pull", { method: "POST", headers: cron });
+    expect((await req("/cron/forecast-input")).res.status).toBe(401);
+    const { res, json } = await req("/cron/forecast-input?hours=6", { headers: cron });
+    expect(res.status).toBe(200);
+    expect(json.spots).toEqual([{ id: creek.id, lat: 19.37, lon: 72.81, kind: "coastal" }]);
+    const times = json.conditions.map((r: { time: string }) => Date.parse(r.time));
+    expect(times.length).toBe(9); // 05:00..13:00 UTC inclusive (NOW = 06:00)
+    expect(Math.min(...times)).toBe(NOW.getTime() - 3_600_000);
+    expect(Math.max(...times)).toBe(NOW.getTime() + 7 * 3_600_000);
+    expect(Object.keys(json.conditions[0]).sort()).toEqual(
+      ["apparent_c", "cloud_pct", "precip_mm", "rh_pct", "spot_id", "temp_c", "tide_m", "time", "us_aqi", "wind_ms"]);
+    expect(json.conditions[0].tide_m).toEqual(expect.any(Number));
   });
 
   it("forecast-ingest stores forecasts and skips unknown spots", async () => {

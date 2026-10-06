@@ -41,3 +41,5 @@ const stop = async () => {
 };
 process.on("SIGINT", stop);
 process.on("SIGTERM", stop);
+// scripts/start.mjs closes our stdin to ask for a clean stop (on Windows a parent can't send SIGINT), so PGlite closes cleanly.
+if (env.SITSPOT_STOP_ON_STDIN_END === "1") process.stdin.on("end", stop).resume();

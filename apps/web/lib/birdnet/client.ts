@@ -7,7 +7,7 @@ export type BirdnetOptions = {
   /** Scientific names (case-insensitive) allowed for this place. Undefined = no regional filter. */
   allowedSpecies?: Set<string>;
   minConfidence?: number;
-  /** Where fetch_model.py put the model files. */
+  /** Where fetch_model.mjs puts the model files. */
   baseUrl?: string;
   /** Backend preference; first that initialises wins. */
   backends?: string[];

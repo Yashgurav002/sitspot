@@ -2,6 +2,8 @@
 
 ## Routes
 
+Paths are on the API. Hosting (docs/setup.md step 11): ElevenLabs calls the API directly at `https://<NGROK_DOMAIN>/v1/voice/...` (preferred); the web proxy also serves them at `https://<web>/api/v1/voice/...`. The SSE reply sets `Cache-Control: no-cache, no-transform` so proxies don't gzip-buffer it; the web proxy streams it (verified chunk-by-chunk).
+
 | Route | Auth | What |
 | --- | --- | --- |
 | `POST /v1/voice/llm/chat/completions` (alias `/v1/voice/llm/v1/chat/completions`) | `X-Voice-Secret` or `Authorization: Bearer` = `VOICE_SHARED_SECRET` | ElevenLabs custom LLM. OpenAI request in, OpenAI SSE chunks out (`stream:false` → one JSON completion). |
@@ -30,13 +32,13 @@ Which invitation a turn is about: `elevenlabs_extra_body.invitation_id` (and `vi
 
 ## Setup
 
-1. Public URL for the API (deployed, or `cloudflared tunnel --url http://localhost:8787`).
+1. Public URL: `pnpm start --tunnel` exposes the API at `https://<NGROK_DOMAIN>` (see `docs/setup.md` step 11).
 2. `.env`: `VOICE_SHARED_SECRET` (random), `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `ELEVENLABS_PHONE_NUMBER_ID`, `ELEVENLABS_WEBHOOK_SECRET`, `MY_PHONE_E164`, and VAPID keys from `pnpm --filter @sitspot/api exec tsx scripts/gen-vapid.ts`.
 3. ElevenLabs agent:
-   - LLM → Custom LLM. Server URL `https://<public>/v1/voice/llm` (the endpoint appended is `/chat/completions`). API key: a secret whose value is `VOICE_SHARED_SECRET`. If a "request headers" field is offered, `X-Voice-Secret: <VOICE_SHARED_SECRET>` works too.
+   - LLM → Custom LLM. Server URL `https://<NGROK_DOMAIN>/v1/voice/llm` (the endpoint appended is `/chat/completions`). API key: a secret whose value is `VOICE_SHARED_SECRET`. If a "request headers" field is offered, `X-Voice-Secret: <VOICE_SHARED_SECRET>` works too.
    - First message: `{{script}}`.
    - System prompt: anything short, plus a line `invitation_id: {{invitation_id}}` (backup for the extra body).
    - Dynamic variables `script`, `invitation_id` (the outbound call fills both).
    - Security → allow overrides of custom LLM extra body if the dashboard asks.
-   - Post-call webhook: `https://<public>/v1/voice/webhooks/post-call`, copy its secret into `ELEVENLABS_WEBHOOK_SECRET`; enable transcription + call-initiation-failure events.
+   - Post-call webhook: `https://<NGROK_DOMAIN>/v1/voice/webhooks/post-call`, copy its secret into `ELEVENLABS_WEBHOOK_SECRET`; enable transcription + call-initiation-failure events.
 4. Telephony: import the Twilio trial number into ElevenLabs → its id is `ELEVENLABS_PHONE_NUMBER_ID`; verify your mobile in Twilio (trial only calls verified numbers).

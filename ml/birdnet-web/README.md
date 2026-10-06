@@ -10,7 +10,7 @@ Option (a): an existing TF.js build. Nothing was converted.
 - The official BirdNET Live PWA (`birdnet-team/real-time-pwa`, MIT code) serves the **byte-identical** `model.json` and adds a fast WebGL STFT kernel. We ported that kernel.
 - Our change: on CPU and WASM, tfjs's generic `tf.signal.stft` took **~49 s per window**, so the STFT is now a plain-JS radix-2 FFT (`stftRealJS`, ~ms). It is unit-tested against a naive DFT and gives scores identical to tfjs's STFT to 3 decimals.
 
-Reproduce: `python ml/birdnet-web/fetch_model.py` (stdlib only; downloads from raw.githubusercontent with 12 parallel connections, then copies the tfjs WASM binaries from `node_modules`). The files are gitignored.
+Reproduce: `node ml/birdnet-web/fetch_model.mjs` (no deps, runs as the apps/web `prebuild`; downloads missing files from raw.githubusercontent with 8 parallel connections, then copies the tfjs WASM binaries from `node_modules`). The files are gitignored.
 
 ## Files (`apps/web/public/birdnet/`)
 

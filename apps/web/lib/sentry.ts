@@ -8,12 +8,14 @@ export const SENTRY_DSN = process.env.NEXT_PUBLIC_SENTRY_DSN;
 const noQuery = (u: unknown) => (typeof u === "string" ? u.split("?")[0] : u);
 const URL_ATTRS = ["url.full", "http.url", "http.target", "url.path", "url"];
 
-/** Origin of the API, for trace propagation (sentry-trace/baggage go to it and nowhere else). */
+/** Origin of the API, for trace propagation (sentry-trace/baggage go to it and nowhere else).
+ *  Same origin by default (/api proxy). */
 export function apiOrigin(): string {
+  const self = typeof location === "undefined" ? "http://localhost:3000" : location.origin;
   try {
-    return new URL(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8787").origin;
+    return new URL(process.env.NEXT_PUBLIC_API_URL || self, self).origin;
   } catch {
-    return "http://localhost:8787";
+    return self;
   }
 }
 

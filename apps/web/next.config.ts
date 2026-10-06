@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs/config";
 
+// /api/* -> the Hono API is a Route Handler (app/api/[...path]/route.ts), not a rewrite: it must add headers
+// (ngrok-skip-browser-warning, x-forwarded-*) and read API_INTERNAL_URL at runtime (Vercel or laptop).
 const nextConfig: NextConfig = {
   transpilePackages: ["@sitspot/shared"],
 };

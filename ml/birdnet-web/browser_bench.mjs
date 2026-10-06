@@ -1,6 +1,6 @@
 // Run the real Web Worker (apps/web/lib/birdnet/worker.ts) in headless Chromium on a clip, per backend.
 // Usage: node ml/birdnet-web/browser_bench.mjs <audio file> [backend ...]   (default: webgl wasm)
-// Needs ffmpeg, the models from fetch_model.py, and Playwright's Chromium (pnpm exec playwright install chromium).
+// Needs ffmpeg, the models from fetch_model.mjs, and Playwright's Chromium (pnpm exec playwright install chromium).
 import { execFileSync, execSync } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdtempSync, readFileSync, existsSync } from "node:fs";

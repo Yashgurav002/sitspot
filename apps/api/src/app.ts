@@ -53,6 +53,9 @@ const SESSION_MS = 30 * DAY;
 const VISIT_MS = 3 * 3_600_000;
 const MAX_SPOTS = 5;
 const MAX_DETECTIONS = 200;
+const LOGIN_MAX_FAILS = 5;
+const LOGIN_WINDOW_MS = 15 * 60_000;
+const HOUR = 3_600_000;
 
 type Env = { Variables: { uid: string; demo: boolean } };
 
@@ -152,10 +155,32 @@ export function createApp(deps: AppDeps) {
     });
   };
 
+  // Login rate limit: LOGIN_MAX_FAILS wrong passcodes per client IP per window -> 429.
+  // IP = x-sitspot-client-ip when the web proxy (apps/web/app/api/[...path]) proves itself with PROXY_SECRET
+  // (needed when ngrok sits between the proxy on Vercel and us); else the LAST x-forwarded-for hop: the
+  // tunnel appends the real peer IP, earlier hops are client-controlled. No header -> shared "local" bucket.
+  // ponytail: in-memory, per process; resets on restart. Move to the DB if the API ever runs >1 instance.
+  const loginFails = new Map<string, { n: number; until: number }>();
+  const clientIp = (c: Context) =>
+    (env.PROXY_SECRET && safeEqual(c.req.header("x-sitspot-proxy-secret") ?? "", env.PROXY_SECRET) && c.req.header("x-sitspot-client-ip"))
+    || c.req.header("x-forwarded-for")?.split(",").at(-1)?.trim() || "local";
+
   app.post("/auth/login", async (c) => {
+    const ip = clientIp(c);
+    const t = now().getTime();
+    const f = loginFails.get(ip);
+    if (f && f.until > t && f.n >= LOGIN_MAX_FAILS) {
+      c.header("retry-after", String(Math.ceil((f.until - t) / 1000)));
+      throw new HTTPException(429, { message: "Too many wrong passcodes. Try again later." });
+    }
     const { passcode } = await body(c, z.object({ passcode: z.string().min(1).max(200) }));
     if (!env.ADMIN_PASSCODE) throw new HTTPException(503, { message: "ADMIN_PASSCODE not configured" });
-    if (!safeEqual(passcode, env.ADMIN_PASSCODE)) throw new HTTPException(401, { message: "Wrong passcode" });
+    if (!safeEqual(passcode, env.ADMIN_PASSCODE)) {
+      if (loginFails.size > 1000) for (const [k, v] of loginFails) if (v.until <= t) loginFails.delete(k);
+      loginFails.set(ip, f && f.until > t ? { n: f.n + 1, until: f.until } : { n: 1, until: t + LOGIN_WINDOW_MS });
+      throw new HTTPException(401, { message: "Wrong passcode" });
+    }
+    loginFails.delete(ip);
     const user = await q.ensureUser(db, adminEmail(env));
     startSession(c, user.id, false);
     return c.json({ user, demo: false });
@@ -434,6 +459,19 @@ export function createApp(deps: AppDeps) {
 
   app.post("/cron/pull", async (c) =>
     c.json(await pullAll(db, { fetch: deps.fetch, now: now(), ebirdKey: env.EBIRD_API_KEY || null })));
+
+  // Input for ml/tabpfn/forecast_job.py --api (no Postgres needed): all spots + conditions now-1h..now+hours+1h.
+  app.get("/cron/forecast-input", async (c) => {
+    const hours = intQuery(c, "hours", 12, 1, 48);
+    const t = now().getTime();
+    const spots = (await q.listAllSpots(db)).map(({ id, lat, lon, kind }) => ({ id, lat, lon, kind }));
+    const conditions = await db.query(
+      `select spot_id, time, temp_c, apparent_c, rh_pct, wind_ms, precip_mm, cloud_pct, us_aqi, tide_m
+       from conditions where time >= $1 and time <= $2 order by spot_id, time`,
+      [new Date(t - HOUR), new Date(t + (hours + 1) * HOUR)],
+    );
+    return c.json({ spots, conditions });
+  });
 
   app.post("/cron/forecast-ingest", bodyLimit({ maxSize: 5 * 1024 * 1024 }), async (c) => {
     const rows = await body(c, z.array(Forecast).max(50_000));
