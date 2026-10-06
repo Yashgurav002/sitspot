@@ -36,7 +36,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
   Checks: SSE endpoint returns valid OpenAI chunks (test); webhook rejects bad signature; call failure falls back to push.
 - [x] **T11 `apps/web`** — Next.js PWA: passcode sign-in, Spots page (Leaflet map), settings (quiet hours, loves), invitations history with factor breakdown, notes + search, `/call/[id]`, service worker for push, manifest. Deps: T07.
   Checks: `next build` passes; Playwright smoke: sign in → add spot → see it listed.
-- [~] **T12 Visit page + BirdNET** — `/visit/[id]`: arrive, wake lock, pocket overlay with 2-s hold exit, mic capture, Web Worker running BirdNET TF.js (or documented honest fallback), regional filter, dedupe, IndexedDB outbox, observations, end + rating. Deps: T11.
+- [x] **T12 Visit page + BirdNET** — `/visit/[id]`: arrive, wake lock, pocket overlay with 2-s hold exit, mic capture, Web Worker running BirdNET TF.js (or documented honest fallback), regional filter, dedupe, IndexedDB outbox, observations, end + rating. Deps: T11.
   Checks: unit tests for dedupe/outbox/filter; build passes; manual terrace test.
 
 ## Wave 4 — Depth

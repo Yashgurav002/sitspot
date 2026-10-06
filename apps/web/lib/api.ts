@@ -1,7 +1,7 @@
 // Typed client for apps/api (spec §8). Cookie session lives on the API origin, so every call
 // runs in the browser with credentials: 'include'.
 import type {
-  ConditionsHour, FieldNote, Forecast, Invitation, InvitationStatus, Preference, Spot, SpotInput, User,
+  ConditionsHour, DetectionInput, FieldNote, Forecast, Invitation, InvitationStatus, Preference, Spot, SpotInput, User, Visit,
 } from "@sitspot/shared";
 
 /** JSON over the wire: Dates arrive as ISO strings. */
@@ -60,6 +60,7 @@ export type Conditions = { conditions: Wire<ConditionsHour>[]; forecasts: Wire<F
 export type WSpot = Wire<Spot>;
 export type WInvitation = Wire<Invitation>;
 export type WNote = Wire<FieldNote>;
+export type WVisit = Wire<Visit>;
 
 export const api = {
   login: (passcode: string) => request<unknown>("/auth/login", { method: "POST", json: { passcode } }),
@@ -77,9 +78,21 @@ export const api = {
 
   invitations: (status?: InvitationStatus) =>
     request<WInvitation[]>(`/v1/invitations${status ? `?status=${q(status)}` : ""}`),
-  invitation: (id: string) => request<WInvitation>(`/v1/invitations/${q(id)}`),
+  invitation: (id: string) => request<WInvitation & { spot_name: string | null }>(`/v1/invitations/${q(id)}`),
   respond: (id: string, accepted: boolean) =>
     request<unknown>(`/v1/invitations/${q(id)}/respond`, { method: "POST", json: { accepted } }),
+
+  arrive: (invitationId: string) =>
+    request<{ visit: WVisit; visit_token: string }>(`/v1/visits/${q(invitationId)}/arrive`, { method: "POST" }),
+  /** Bearer visit token: works even if the session cookie has lapsed mid-visit. Idempotent. */
+  detections: (visitId: string, token: string, rows: Wire<DetectionInput>[]) =>
+    request<{ inserted: number; received: number }>(`/v1/visits/${q(visitId)}/detections`, {
+      method: "POST", json: rows, headers: { authorization: `Bearer ${token}` },
+    }),
+  observe: (visitId: string, text: string) =>
+    request<unknown>(`/v1/visits/${q(visitId)}/observations`, { method: "POST", json: { text } }),
+  endVisit: (visitId: string, rating: number | null) =>
+    request<{ visit: WVisit }>(`/v1/visits/${q(visitId)}/end`, { method: "POST", json: { rating } }),
 
   notes: () => request<WNote[]>("/v1/notes"),
   searchNotes: (text: string) => request<WNote[]>(`/v1/notes/search?q=${q(text)}`),
