@@ -2,6 +2,37 @@
 
 Each task = one issue. `Deps` must be done first. Every task is **done only when its checks pass** (`pnpm test` for the touched package, plus the listed checks). Status: `[ ]` todo · `[~]` in progress · `[x]` done.
 
+## Where we are (updated 2026-10-06 evening)
+
+**Done:** T00–T13, T15 — all committed with passing tests (`git log --oneline`).
+**In progress (agents may have been interrupted — check `git status` for uncommitted work):**
+- T14 Sentry (API/workers/LLM part). Web part of Sentry still to do.
+- T16 Evaluation (retrieval, agent safety, voice latency, 20-kill durability) → `evaluation/`.
+- eBird export for TabPFN running in background → `ml/tabpfn/cache/checklists.csv`, log `ml/tabpfn/cache/export.log`. Cached; rerun the same command to resume:
+  `cd ml/tabpfn && EBIRD_API_KEY=... .venv/Scripts/python export_ebird.py --start 2022-09-01 --end 2026-10-05 --max 8000`
+  Then: `features.py` → `train_eval.py` (writes `evaluation/tabpfn_results.md`).
+
+**Next up:** T18 deploy (decide API/worker host + Postgres + public GitHub repo) → T19 docs → T17 fine-tune (optional).
+
+**Waiting on the user:**
+- Twilio trial: verify +91 number, check Voice → Geo permissions allows India.
+- ElevenLabs free account + API key (agent setup happens after we have a public URL; steps in `apps/api/src/voice/README.md`).
+- Optional: Sentry DSN, public GitHub repo URL.
+- Real-world: 4+ visits Thu–Sat (creek on falling tide + one sunset), film them, notes in `docs/field-notes.md`.
+
+**Decisions made (don't re-litigate):**
+- LLM: scripts/notes = `gemma-4-31b-it` on AI Studio (slow ~100 s, thinks first; stripped in `packages/llm`); voice chat = `gemma3:1b` on local Ollama (`CHAT_LLM_BASE_URL`) for latency.
+- Tide from Open-Meteo is timing-only (no heights in scripts) — coarse open-coast model.
+- eBird district codes verified: IN-MH-PG, IN-MH-TH, IN-MH-MC, IN-MH-MS.
+- Dev DB = PGlite (`.pglite/`); prod = any Postgres with pgvector via `DATABASE_URL`.
+- Temporal worker runs inside the API process; local dev server: `"$LOCALAPPDATA/Temp/temporal-sdk-typescript-1.24.0.exe" server start-dev --db-filename .temporal/temporal.db` (UI :8233).
+- Learned per-hour accept factors stored in `users.accept_factors` (not preferences — those must be the user's own words).
+- Credits needed in README/DEV post: TabPFN by Prior Labs; BirdNET (Kahl et al. 2021, CC BY-NC-SA 4.0).
+
+**Known gaps / before going public:** login rate limit; strong ADMIN_PASSCODE set only in host env; `COOKIE_CROSS_SITE=1` (or proxy) when web and API are on different sites; BirdNET + battery untested on a real phone (needs HTTPS).
+
+**Run locally:** start Temporal (above) → `pnpm --filter @sitspot/api start` (:8787) → `pnpm --filter @sitspot/web dev` (:3000) → sign in with `ADMIN_PASSCODE`. Tests: `pnpm -r test`.
+
 ## Wave 0 — Foundation (sequential)
 
 - [x] **T00 Monorepo scaffold** — pnpm workspaces, tsconfig base, Vitest, ESLint, `.env.example` (§16), CI workflow (lint+typecheck+test), README stub, empty packages with `index.ts`.
@@ -44,7 +75,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 - [x] **T13 Memory** — preference extraction from `intent` with quoted utterance → `preferences`; policy reads `spot_weekends_only` / `avoid_*`; nightly reflect: threshold nudge ±0.05, per-hour accept factors. Deps: T09.
 - [~] **T14 Observability** — Sentry in api/web/workflows with spans + attributes (§17.4); no-op without DSN. Deps: T09–T11.
 - [x] **T15 Scheduling + MCP** — `.github/workflows/cron.yml`; read-only `/mcp` tools. Deps: T07.
-- [ ] **T16 Evaluation** — retrieval eval (40 Qs: BM25 vs vector vs hybrid), agent eval (40 scripted turns), durability (20 kills) → `evaluation/*.md`. Deps: T09, T06, T02.
+- [~] **T16 Evaluation** — retrieval eval (40 Qs: BM25 vs vector vs hybrid), agent eval (40 scripted turns), durability (20 kills) → `evaluation/*.md`. Deps: T09, T06, T02.
 - [ ] **T17 (P2) Fine-tune** — `ml/finetune` dataset builder + verifier + Kaggle notebook + eval. Deps: T06.
 
 ## Wave 5 — Ship
