@@ -14,7 +14,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
   Checks: tests run migrations on in-memory PGlite and exercise every helper incl. hybrid search.
 - [~] **T03 `packages/data`** — Open-Meteo forecast/air-quality/marine clients, eBird recent-obs client, suncalc sun helpers, derived features (`minutes_from_sunrise`, `minutes_to_sunset`, `is_golden_hour`, `tide_trend`, `hours_to_low_tide`, `hours_to_high_tide`, next low/high tide). zod parsing. Deps: T00.
   Checks: unit tests on recorded fixtures (fetched once from the real API and committed); one opt-in live test (`LIVE=1`) hitting Open-Meteo for Vasai.
-- [~] **T04 `packages/policy`** — `config.ts` weights; `comfort`, `tideFit`, `lightBonus`, `novelty`, `availability`, `score`, `safetyCheck` (S-1..S-5), `evaluateWindows(spots, conditions, forecasts, sun, user, history, now)` → ranked candidates with factors + reason; `sendAt`. Pure functions. Deps: T00.
+- [x] **T04 `packages/policy`** — `config.ts` weights; `comfort`, `tideFit`, `lightBonus`, `novelty`, `availability`, `score`, `safetyCheck` (S-1..S-5), `evaluateWindows(spots, conditions, forecasts, sun, user, history, now)` → ranked candidates with factors + reason; `sendAt`. Pure functions. Deps: T00.
   Checks: a test for every safety rule and every factor boundary; property test that no candidate violating safety is ever returned.
 - [x] **T05 `packages/llm`** — one OpenAI-compatible client (`chat`, `chatStream`, `json<T>(schema)`, `embed`), configured by env; timeouts; returns token usage + latency. Deps: T00.
   Checks: tests against a local fake HTTP server; opt-in live test against Ollama.
