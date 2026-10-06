@@ -8,3 +8,4 @@ allowBuilds:
   protobufjs: true
   sharp: true
   unrs-resolver: true
+  core-js: false

@@ -11,7 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
+    "@sitspot/llm": "workspace:*",
     "@sitspot/shared": "workspace:*",
-    "@sitspot/llm": "workspace:*"
+    "zod": "^4.6.5"
   }
 }
