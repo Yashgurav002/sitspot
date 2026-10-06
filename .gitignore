@@ -12,3 +12,5 @@ coverage
 .turbo
 test-results
 playwright-report
+.temporal/
+.pglite-e2e/
