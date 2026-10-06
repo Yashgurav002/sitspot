@@ -14,6 +14,7 @@ export interface Numbers {
   us_aqi?: number;
   wind_ms?: number;
   tide?: Tide;
+  sunrise?: Date;
   sunset?: Date;
   golden_start?: Date;
 }
@@ -76,3 +77,21 @@ export function confidenceWord(c: number): string {
   if (c >= 0.6) return 'fairly confident, not certain';
   return 'possibly';
 }
+
+/** S-1: minutes before sunset the coast closes. Mirrors policy; the agent re-checks it (defence in depth). */
+export const COAST_CLOSE_BEFORE_SUNSET_MIN = 30;
+
+/** S-1: coastal spot and `at` (default now) is ≥ sunset − 30 min or before sunrise. Unknown sunset → open (policy is the gate). */
+export function coastalClosed(f: Pick<InvitationFacts, 'now' | 'spot' | 'numbers'>, at: Date = f.now): boolean {
+  const { sunset, sunrise } = f.numbers;
+  if (f.spot.kind !== 'coastal' || !sunset) return false;
+  return at.getTime() >= sunset.getTime() - COAST_CLOSE_BEFORE_SUNSET_MIN * 60_000 || (!!sunrise && at < sunrise);
+}
+
+/** The next window, if it is still ahead and the coast is open then. */
+export function nextWindow(f: InvitationFacts): Date | undefined {
+  return f.window_start > f.now && !coastalClosed(f, f.window_start) ? f.window_start : undefined;
+}
+
+/** Low tide that hasn't happened yet; a past low is not a reason to go. */
+export const upcomingLow = (t: Tide | undefined, now: Date) => (t?.low_time && t.low_time >= now ? t.low_time : undefined);

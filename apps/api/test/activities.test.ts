@@ -98,6 +98,16 @@ describe("activities", () => {
     expect(runs).toEqual([{ kind: "script", model: "template" }]);
   });
 
+  it("composeScript: passes sunrise/sunset and drops a low tide that has already passed", async () => {
+    const late = createActivities({ db, env: {}, now: () => new Date(LOW.getTime() + 30 * 60_000), llm: { script: brokenLlm(seen), note: brokenLlm() }, deliver: async () => ({ channel: "push" }) });
+    const { invitationId } = await late.createInvitation(userId, pick(), "inv-wf");
+    const r = await late.composeScript(invitationId);
+    const context = seen[0]!.map((m) => m.content).join("\n");
+    expect(context).toMatch(/sunrise \d\d:\d\d; sunset \d\d:\d\d/);
+    expect(context).not.toContain("low tide 14:00");
+    expect(r.script).not.toMatch(/low tide/i);
+  });
+
   it("deliver marks sent once and never re-delivers", async () => {
     const a = acts();
     const { invitationId } = await a.createInvitation(userId, pick(), "inv-wf");

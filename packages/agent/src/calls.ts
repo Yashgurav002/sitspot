@@ -4,10 +4,12 @@
 import type { Llm, Message, Usage } from '@sitspot/llm';
 import { z } from 'zod';
 import { buildContextBlock, renderDayFacts } from './context.js';
-import { type DayFacts, type InvitationFacts, fmtTime } from './facts.js';
+import { type DayFacts, type InvitationFacts, coastalClosed, fmtTime } from './facts.js';
 import { CHAT_INSTRUCTIONS, INTENT_INSTRUCTIONS, NOTE_INSTRUCTIONS, SCRIPT_INSTRUCTIONS, SYSTEM_PROMPT, feedback } from './prompts.js';
 import { templateChat, templateNote, templateScript } from './templates.js';
-import { hasSafetyLine, mentionsTime, numbersInFacts, quoteIsSubstring, speciesInFacts, unsafeAdvice, verifyNote } from './validate.js';
+import {
+  coastalClosedProblems, confidenceBands, hasSafetyLine, mentionsTime, numbersInFacts, pastLowTide, quoteIsSubstring, speciesInFacts, unsafeAdvice, verifyNote,
+} from './validate.js';
 
 export interface CallMeta {
   model: string;
@@ -72,6 +74,9 @@ export function checkScript(out: { script: string; reason: string }, facts: Invi
     ...numbersInFacts(out.script, context),
     ...speciesInFacts(out.script, allowed),
     ...hasSafetyLine(out.script, facts.spot.kind),
+    ...coastalClosedProblems(out.script, facts),
+    ...pastLowTide(out.script, facts),
+    ...pastLowTide(out.reason, facts).map((p) => `reason: ${p}`),
     ...(mentionsTime(out.script, facts.leave_by) ? [] : [`script must say when to leave: "leave by ${fmtTime(facts.leave_by)}"`]),
     ...(mentionsTime(out.script, facts.window_end) ? [] : [`script must say how long it stays good: "until ${fmtTime(facts.window_end)}"`]),
     ...numbersInFacts(out.reason, context).map((p) => `reason: ${p}`),
@@ -81,6 +86,9 @@ export function checkScript(out: { script: string; reason: string }, facts: Invi
 }
 
 export async function composeScript(llm: Llm, facts: InvitationFacts): Promise<ScriptResult> {
+  // S-1 defence in depth: policy never schedules this, but if it does, no model call and no "Want to go?".
+  if (coastalClosed(facts))
+    return { ...templateScript(facts), meta: { model: llm.model, tokens_in: 0, tokens_out: 0, latency_ms: 0, attempts: 0, fallback: true, problems: ['coastal spot after sunset − 30 min (S-1)'] } };
   const context = buildContextBlock(facts);
   const { value, meta } = await tryTwice(llm, withContext(SCRIPT_INSTRUCTIONS, context), (m) =>
     jsonAttempt(llm, m, ScriptOut, (v) => {
@@ -96,7 +104,8 @@ export async function composeScript(llm: Llm, facts: InvitationFacts): Promise<S
 
 /** First n sentences. */
 export function firstSentences(text: string, n = 3): string {
-  const parts = text.replace(/\s+/g, ' ').trim().match(/[^.!?]+(?:[.!?]+|$)/g) ?? [];
+  // A "." inside a number ("0.71") does not end a sentence.
+  const parts = text.replace(/\s+/g, ' ').trim().match(/(?:[^.!?]|\.(?=\d))+(?:[.!?]+|$)/g) ?? [];
   return parts.slice(0, n).join('').trim();
 }
 
@@ -116,7 +125,14 @@ export async function chatTurn(llm: Llm, { facts, history, utterance }: ChatInpu
     const r = await llm.chat(m, { temperature: 0.5, maxTokens: 200 });
     const reply = firstSentences(r.text);
     const problems = reply
-      ? [...speciesInFacts(reply, allowedSpecies(facts)), ...unsafeAdvice(reply), ...numbersInFacts(reply, grounding)]
+      ? [
+          ...speciesInFacts(reply, allowedSpecies(facts)),
+          ...unsafeAdvice(reply),
+          ...numbersInFacts(reply, grounding),
+          ...confidenceBands(reply, facts.detections),
+          ...coastalClosedProblems(reply, facts),
+          ...pastLowTide(reply, facts),
+        ]
       : ['empty reply'];
     return { value: reply, raw: r.text, problems, usage: r.usage, latency_ms: r.latency_ms };
   });

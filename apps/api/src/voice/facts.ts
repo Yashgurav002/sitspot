@@ -24,11 +24,14 @@ export async function buildInvitationFacts(db: Db, invitationId: string, now: Da
     apparent_c: def(at?.apparent_c),
     us_aqi: def(at?.us_aqi),
     wind_ms: def(at?.wind_ms),
+    sunrise: sun.sunrise,
     sunset: sun.sunset,
     golden_start: sun.goldenHourStart,
   };
   if (spot.kind === "coastal" && series.some((r) => r.tide_m != null)) {
-    const low = nextLowTide(series, new Date(ws.getTime() - HOUR));
+    // A low that has already passed is not a reason to go: keep only an upcoming low ("tide rising" otherwise).
+    const found = nextLowTide(series, new Date(ws.getTime() - HOUR));
+    const low = found && found.time >= now ? found : undefined;
     numbers.tide = { low_time: low?.time, low_m: def(low?.tide_m), trend: def(tideTrend(series, ws)) };
   }
 

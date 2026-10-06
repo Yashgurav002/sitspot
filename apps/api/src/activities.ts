@@ -68,12 +68,14 @@ export function createActivities(deps: ActivityDeps): Activities {
     if (cond?.us_aqi != null) numbers.us_aqi = cond.us_aqi;
     if (cond?.wind_ms != null) numbers.wind_ms = cond.wind_ms;
     const sun = sunTimes(ws, spot.lat, spot.lon);
+    numbers.sunrise = sun.sunrise;
     numbers.sunset = sun.sunset;
     if (inv.factors.light_bonus > 1) numbers.golden_start = sun.goldenHourStart;
     if (spot.kind === "coastal") {
       const series = await q.getConditions(db, spot.id, new Date(ws.getTime() - 12 * HOUR), new Date(ws.getTime() + 12 * HOUR));
       const mid = ws.getTime() + (new Date(inv.window_end).getTime() - ws.getTime()) / 2;
-      const low = tideEvents(series).lows.sort((a, b) => Math.abs(+a.time - mid) - Math.abs(+b.time - mid))[0];
+      // Only an upcoming low: a passed one is not a reason to go (the trend then says "rising").
+      const low = tideEvents(series).lows.filter((l) => +l.time >= +t).sort((a, b) => Math.abs(+a.time - mid) - Math.abs(+b.time - mid))[0];
       const trend = tideTrend(series, ws);
       if (low || trend) numbers.tide = { ...(low && { low_time: low.time }), ...(trend && { trend }) };
     }

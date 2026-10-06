@@ -1,7 +1,7 @@
 // Hallucinating / broken model outputs must never reach the user.
 import { describe, expect, it } from 'vitest';
 import { chatTurn, chatTurnStream, checkScript, composeScript, extractIntent, templateChat, templateNote, templateScript, verifyNote, writeNote } from '../src/index.js';
-import { creek, fakeLlm, park, visitDay } from './fixtures.js';
+import { creek, fakeLlm, ist, park, visitDay } from './fixtures.js';
 
 const j = (o: unknown) => JSON.stringify(o);
 const good = { script: 'Creek edge is good now. Low tide is at 17:20 and falling, and 6 Little Egrets were seen. Leave by 17:05; it stays good until 18:05. Stay on firm ground. Want to go?', reason: 'Falling tide with low at 17:20.' };
@@ -127,6 +127,69 @@ describe('chatTurn', () => {
     }
     expect(text).toBe(templateChat(input.facts));
     expect(res.value.meta.fallback).toBe(true);
+  });
+});
+
+describe('fixes from the agent eval', () => {
+  const dusk = { ...creek, now: ist('2026-10-08T19:30') }; // coastal, after sunset − 30
+
+  it('after dark: "good idea to head to the creek" twice → too-late fallback (eval c35)', async () => {
+    const bad = "It's cooler now, so it's a good idea to head to the creek. It's about 12 minutes away.";
+    const { llm, calls } = fakeLlm([bad, 'Yes, you can still go out on the sand.']);
+    const r = await chatTurn(llm, { facts: dusk, history: [], utterance: "It's cooler now, should I head to the creek?" });
+    expect(r.meta).toMatchObject({ attempts: 2, fallback: true });
+    expect(r.reply).toMatch(/too late for the coast today/);
+    expect(calls[0]!.at(-1)!.content).not.toContain('Too late'); // utterance; context is in the 2nd message
+    expect(calls[0]![1]!.content).toContain('Too late for the coast now (after sunset − 30 min). Do not suggest going.');
+  });
+
+  it('after dark on a visit: fallback tells them to head back and leave', async () => {
+    const facts = { ...dusk, detections: [{ common_name: 'Little Egret', confidence: 0.88, time: dusk.now }] };
+    const r = await chatTurn(fakeLlm(['Lovely night for it!', 'Enjoy the sunset.']).llm, { facts, history: [], utterance: 'Anything else around?' });
+    expect(r.reply).toMatch(/head back to firm ground and leave/);
+  });
+
+  it('after dark: a clear "too late" from the model is kept', async () => {
+    const ok = "It's too late for the creek now, please don't go tonight.";
+    const r = await chatTurn(fakeLlm([ok]).llm, { facts: dusk, history: [], utterance: 'Is it too late to go?' });
+    expect(r).toMatchObject({ reply: ok, meta: { fallback: false } });
+  });
+
+  it('composeScript after dark: no model call, no invitation', async () => {
+    const { llm, calls } = fakeLlm([j(good)]);
+    const r = await composeScript(llm, dusk);
+    expect(calls).toHaveLength(0);
+    expect(r.meta).toMatchObject({ fallback: true, attempts: 0 });
+    expect(r.script).not.toMatch(/want to go/i);
+  });
+
+  it('0.45 detection called "fairly confident" → retried with the right word (eval c17)', async () => {
+    const facts = { ...creek, now: ist('2026-10-08T17:35'), detections: [{ common_name: 'Little Egret', confidence: 0.45, time: creek.now }] };
+    const { llm, calls } = fakeLlm(["That's a Little Egret, I'm fairly confident.", "That's possibly a Little Egret."]);
+    const r = await chatTurn(llm, { facts, history: [], utterance: 'What bird is that?' });
+    expect(r).toMatchObject({ reply: "That's possibly a Little Egret.", meta: { attempts: 2, fallback: false } });
+    expect(calls[1]!.at(-1)!.content).toContain('say "possibly"');
+  });
+
+  it('detected bird named with no confidence twice → fallback names it with its band word', async () => {
+    const facts = { ...creek, now: ist('2026-10-08T17:35'), detections: [{ common_name: 'Common Kingfisher', confidence: 0.86, time: creek.now }] };
+    const r = await chatTurn(fakeLlm(['That was a Common Kingfisher.', 'A Common Kingfisher.']).llm, { facts, history: [], utterance: "What's that call?" });
+    expect(r.meta.fallback).toBe(true);
+    expect(r.reply).toContain('Common Kingfisher (confident)');
+  });
+
+  it('"doesn\'t mention swimming" is no longer a false positive (eval c07)', async () => {
+    const reply = 'I don’t know. The context doesn’t mention swimming.';
+    const r = await chatTurn(fakeLlm([reply]).llm, { facts: creek, history: [], utterance: 'Is it okay to swim at the beach?' });
+    expect(r).toMatchObject({ reply, meta: { fallback: false } });
+  });
+
+  it('script selling a passed low tide → rejected (eval s08)', async () => {
+    const rising = { ...creek, numbers: { ...creek.numbers, tide: { low_time: ist('2026-10-08T16:50'), trend: 'rising' as const } } };
+    const bad = j({ ...good, script: good.script.replace('Low tide is at 17:20 and falling', 'Low tide was at 16:50') });
+    const r = await composeScript(fakeLlm([bad, bad]).llm, rising);
+    expect(r.meta.fallback).toBe(true);
+    expect(r.script).not.toMatch(/low tide/i);
   });
 });
 

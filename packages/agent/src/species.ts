@@ -6,7 +6,7 @@
 export const BIRD_GROUPS = [
   'egret', 'heron', 'pond heron', 'night heron', 'bittern', 'kingfisher', 'bulbul', 'myna', 'mynah', 'drongo',
   'kite', 'eagle', 'harrier', 'falcon', 'kestrel', 'shikra', 'osprey', 'sandpiper', 'plover', 'lapwing', 'tern',
-  'gull', 'bee eater', 'sunbird', 'koel', 'crow', 'parakeet', 'barbet', 'woodpecker', 'cormorant', 'darter',
+  'gull', 'seagull', 'bee eater', 'sunbird', 'koel', 'crow', 'parakeet', 'barbet', 'woodpecker', 'cormorant', 'darter',
   'stork', 'ibis', 'spoonbill', 'flamingo', 'pelican', 'stilt', 'avocet', 'redshank', 'greenshank', 'godwit',
   'curlew', 'whimbrel', 'stint', 'dove', 'pigeon', 'owl', 'owlet', 'nightjar', 'hoopoe', 'coucal', 'cuckoo',
   'oriole', 'robin', 'magpie robin', 'shrike', 'prinia', 'tailorbird', 'warbler', 'flycatcher', 'wagtail',

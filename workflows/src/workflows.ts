@@ -10,10 +10,11 @@ const HOUR = 60 * MIN;
 const IST_MS = 5.5 * HOUR;
 export const TASK_QUEUE = "sitspot";
 
-const acts = proxyActivities<Activities>({
-  startToCloseTimeout: "2 minutes",
-  retry: { maximumAttempts: 3, initialInterval: "5 seconds", backoffCoefficient: 2, nonRetryableErrorTypes: ["ValidationError"] },
-});
+const retry = { maximumAttempts: 3, initialInterval: "5 seconds", backoffCoefficient: 2, nonRetryableErrorTypes: ["ValidationError"] };
+// DB/policy/delivery activities: fast. LLM activities: a Gemma call on AI Studio takes 60–110 s and the
+// agent retries once on validation (LLM_TIMEOUT_MS=180000 each), so 2 min would kill and re-run them.
+const acts = proxyActivities<Activities>({ startToCloseTimeout: "1 minute", retry });
+const llmActs = proxyActivities<Pick<Activities, "composeScript" | "compileVisit">>({ startToCloseTimeout: "10 minutes", retry });
 
 // ---------- signals / queries ----------
 export const respondedSignal = defineSignal<[{ accepted: boolean }]>("responded");
@@ -88,7 +89,7 @@ export async function InvitationWorkflow({ invitationId, sendAt, windowEnd }: In
   if (wait > 0) await sleep(wait);
 
   if (!(await acts.recheckWindow(invitationId)).ok) return finish("cancelled");
-  await acts.composeScript(invitationId);
+  await llmActs.composeScript(invitationId);
   await acts.deliver(invitationId);
   status = "sent";
 
@@ -102,6 +103,6 @@ export async function InvitationWorkflow({ invitationId, sendAt, windowEnd }: In
   }
   await finish("arrived");
   await condition(() => ended, "90 minutes");
-  await acts.compileVisit(invitationId);
+  await llmActs.compileVisit(invitationId);
   return finish("completed");
 }
