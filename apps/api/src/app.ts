@@ -15,6 +15,9 @@ import { safeEqual, sign, verify } from "./auth";
 import { evaluateForUser } from "./services/evaluate";
 import { pullAll } from "./services/pull";
 import { mcpHandler } from "./mcp";
+import { llmFromEnv, type Llm } from "@sitspot/llm";
+import { voicePublic, voiceSession, type VoiceDeps } from "./voice";
+import type { PushSender } from "./delivery";
 
 export type Signals = {
   responded?(invitationId: string, accepted: boolean): unknown;
@@ -31,6 +34,10 @@ export type AppDeps = {
   embed?: (text: string) => Promise<number[]>;
   /** Temporal signal hooks (wired in T09). Errors are logged, never fail the request. */
   signals?: Signals;
+  /** Chat LLM for the voice endpoint (default llmFromEnv("chat")). */
+  llm?: Llm;
+  /** web-push sender override (tests). */
+  push?: PushSender;
 };
 
 export const SESSION_COOKIE = "sitspot_session";
@@ -193,6 +200,22 @@ export function createApp(deps: AppDeps) {
     },
   );
 
+  // ---------- voice (ElevenLabs: own secret / HMAC, so before the session guard) ----------
+  const CLOSED = new Set(["arrived", "completed", "missed", "cancelled"]);
+  const respond = async (inv: Invitation, accepted: boolean) => {
+    if (CLOSED.has(inv.status)) throw new HTTPException(409, { message: `invitation is ${inv.status}` });
+    const updated = await q.setInvitationStatus(db, inv.id, accepted ? "accepted" : "declined", { responded_at: now() });
+    await signal("responded", inv.id, accepted);
+    return updated;
+  };
+  const voice: VoiceDeps = {
+    db, env, now, fetch: deps.fetch, push: deps.push, respond,
+    llm: deps.llm ?? llmFromEnv("chat", env),
+    ownerId: async () => (await q.ensureUser(db, adminEmail(env))).id,
+    log: (r) => q.logAgentRun(db, r),
+  };
+  app.route("/v1/voice", voicePublic(voice));
+
   app.use("/v1/*", async (c, next) => {
     const s = session(c);
     if (!s) throw new HTTPException(401, { message: "unauthorized" });
@@ -293,15 +316,13 @@ export function createApp(deps: AppDeps) {
 
   app.get("/v1/invitations/:id", async (c) => c.json(await withSpot(await ownedInvitation(id(c), c.var.uid))));
 
-  const CLOSED = new Set(["arrived", "completed", "missed", "cancelled"]);
   app.post("/v1/invitations/:id/respond", async (c) => {
     const inv = await ownedInvitation(id(c), c.var.uid);
     const { accepted } = await body(c, z.object({ accepted: z.boolean() }));
-    if (CLOSED.has(inv.status)) throw new HTTPException(409, { message: `invitation is ${inv.status}` });
-    const updated = await q.setInvitationStatus(db, inv.id, accepted ? "accepted" : "declined", { responded_at: now() });
-    await signal("responded", inv.id, accepted);
-    return c.json({ invitation: updated });
+    return c.json({ invitation: await respond(inv, accepted) });
   });
+
+  app.route("/v1/voice", voiceSession(voice));
 
   // ---------- visits ----------
   const visitToken = (vid: string) => sign({ typ: "visit", vid, exp: now().getTime() + VISIT_MS }, secret);
