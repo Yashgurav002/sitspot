@@ -36,7 +36,7 @@ _last_call = 0.0
 
 
 def cached_get(url: str, params: dict | None = None, headers: dict | None = None,
-               min_interval: float = 1.5):
+               min_interval: float = 2.0):
     """GET JSON with an on-disk cache (key excludes headers, so tokens never hit disk)."""
     global _last_call
     key = hashlib.sha1(json.dumps([url, sorted((params or {}).items())]).encode()).hexdigest()
@@ -48,7 +48,14 @@ def cached_get(url: str, params: dict | None = None, headers: dict | None = None
         time.sleep(wait)
     for attempt in range(1, 7):
         _last_call = time.monotonic()
-        r = requests.get(url, params=params, headers=headers, timeout=60)
+        try:
+            r = requests.get(url, params=params, headers=headers, timeout=60)
+        except (requests.ConnectionError, requests.Timeout) as e:
+            if attempt == 6:
+                raise
+            print(f"{type(e).__name__}, retrying in {30 * attempt}s (attempt {attempt})", file=sys.stderr)
+            time.sleep(30 * attempt)
+            continue
         if r.status_code not in (429, 500, 502, 503, 504) or attempt == 6:
             break
         # eBird rate-limits even at 1 req/s; back off (honour Retry-After when given).
