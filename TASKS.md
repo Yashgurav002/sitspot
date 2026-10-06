@@ -7,7 +7,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 **Done:** T00–T13, T15 — all committed with passing tests (`git log --oneline`).
 **In progress (agents may have been interrupted — check `git status` for uncommitted work):**
 - T14: API/workers/LLM Sentry done (no-op without SENTRY_DSN_API). Web (@sentry/nextjs) part still to do.
-- T16 Evaluation (retrieval, agent safety, voice latency, 20-kill durability) → `evaluation/`.
+- T16 done (`evaluation/`). Fix-up in progress for eval findings: chat could encourage the coast after dark (S-1 not enforced in agent), wrong confidence band words, unsafe-regex false positives, "1 minutes", past low tide sold as upcoming, and 2-min activity timeout too short for Gemma 4 script calls.
 - eBird export for TabPFN running in background → `ml/tabpfn/cache/checklists.csv`, log `ml/tabpfn/cache/export.log`. Cached; rerun the same command to resume:
   `cd ml/tabpfn && EBIRD_API_KEY=... .venv/Scripts/python export_ebird.py --start 2022-09-01 --end 2026-10-05 --stride 3 --max 8000` (eBird 429s after ~600 fast calls; script backs off. Later rerun with `--stride 1` to fill in days — cached calls are free.)
   Then: `features.py` → `train_eval.py` (writes `evaluation/tabpfn_results.md`).
