@@ -12,7 +12,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
   `cd ml/tabpfn && EBIRD_API_KEY=... .venv/Scripts/python export_ebird.py --start 2022-09-01 --end 2026-10-05 --stride 3 --max 8000` (eBird 429s after ~600 fast calls; script backs off. Later rerun with `--stride 1` to fill in days — cached calls are free.)
   Then: `features.py` → `train_eval.py` (writes `evaluation/tabpfn_results.md`).
 
-**Next up:** T18 deploy (decide API/worker host + Postgres + public GitHub repo) → T19 docs → T17 fine-tune (optional).
+**Next up:** T18 in progress — decided: everything on the laptop + one HTTPS tunnel (ngrok static domain recommended) to the Next app, which proxies `/api/*` to the API (same origin, no cross-site cookies); DB stays PGlite; TabPFN forecast job talks to the API (`--api`) instead of Postgres; `pnpm start` runs Temporal + API + web + local hourly cron. T19 first-pass docs done (README, docs/). T17 fine-tune optional.
 
 **Waiting on the user:**
 - Twilio trial: verify +91 number, check Voice → Geo permissions allows India.
@@ -80,5 +80,5 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 
 ## Wave 5 — Ship
 
-- [ ] **T18 Deploy** — web to Vercel; API target decided (Vercel / Render); worker host; env set; cron live.
-- [ ] **T19 Docs** — README, architecture image, `docs/field-notes.md`, demo account.
+- [~] **T18 Deploy** — web to Vercel; API target decided (Vercel / Render); worker host; env set; cron live.
+- [x] **T19 Docs** — README, architecture image, `docs/field-notes.md`, demo account.
