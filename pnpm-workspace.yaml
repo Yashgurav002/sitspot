@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+  - workflows
+allowBuilds:
+  esbuild: true
+  "@swc/core": true
+  protobufjs: true
+  sharp: true
+  unrs-resolver: true

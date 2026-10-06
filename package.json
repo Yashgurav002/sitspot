@@ -1,0 +1,21 @@
+{
+  "name": "sitspot",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel --filter ./apps/* dev",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test && vitest run --root tests --passWithNoTests",
+    "worker": "pnpm --filter @sitspot/workflows worker"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.3"
+  }
+}

@@ -1,0 +1,53 @@
+# Sitspot — Tasks
+
+Each task = one issue. `Deps` must be done first. Every task is **done only when its checks pass** (`pnpm test` for the touched package, plus the listed checks). Status: `[ ]` todo · `[~]` in progress · `[x]` done.
+
+## Wave 0 — Foundation (sequential)
+
+- [ ] **T00 Monorepo scaffold** — pnpm workspaces, tsconfig base, Vitest, ESLint, `.env.example` (§16), CI workflow (lint+typecheck+test), README stub, empty packages with `index.ts`.
+  Checks: `pnpm install`, `pnpm -r typecheck`, `pnpm -r test` green.
+
+## Wave 1 — Independent packages (parallel)
+
+- [ ] **T01 `packages/shared`** — zod schemas + TS types: Spot, ConditionsHour, Sighting, Forecast, Invitation (+status enum), Factors, Visit, Detection, Observation, FieldNote, Preference. Deps: T00.
+- [ ] **T02 `packages/db`** — SQL migration from §7 (PGlite-compatible; Timescale lines commented), migration runner, `getDb()` returning a `query(sql, params)` adapter over PGlite (no `DATABASE_URL`) or `postgres` (with it). Query helpers: spots CRUD, upsert conditions/sightings/forecasts, invitations CRUD/status, visits, detections (idempotent), observations, notes, preferences, hybrid search (RRF). Deps: T00.
+  Checks: tests run migrations on in-memory PGlite and exercise every helper incl. hybrid search.
+- [ ] **T03 `packages/data`** — Open-Meteo forecast/air-quality/marine clients, eBird recent-obs client, suncalc sun helpers, derived features (`minutes_from_sunrise`, `minutes_to_sunset`, `is_golden_hour`, `tide_trend`, `hours_to_low_tide`, `hours_to_high_tide`, next low/high tide). zod parsing. Deps: T00.
+  Checks: unit tests on recorded fixtures (fetched once from the real API and committed); one opt-in live test (`LIVE=1`) hitting Open-Meteo for Vasai.
+- [ ] **T04 `packages/policy`** — `config.ts` weights; `comfort`, `tideFit`, `lightBonus`, `novelty`, `availability`, `score`, `safetyCheck` (S-1..S-5), `evaluateWindows(spots, conditions, forecasts, sun, user, history, now)` → ranked candidates with factors + reason; `sendAt`. Pure functions. Deps: T00.
+  Checks: a test for every safety rule and every factor boundary; property test that no candidate violating safety is ever returned.
+- [ ] **T05 `packages/llm`** — one OpenAI-compatible client (`chat`, `chatStream`, `json<T>(schema)`, `embed`), configured by env; timeouts; returns token usage + latency. Deps: T00.
+  Checks: tests against a local fake HTTP server; opt-in live test against Ollama.
+
+## Wave 2 — Brain and API (parallel, after Wave 1)
+
+- [ ] **T06 `packages/agent`** — context block builder (§9.2), system prompt (§9.3), `composeScript`, `chat`, `extractIntent`, `writeNote`; grounding validators (numbers-in-facts, species-in-facts, quote-substring, coastal safety line, note verifier); retry-once then deterministic template fallback. Deps: T01, T05.
+  Checks: unit tests for every validator; `tests/when_ai_is_wrong.test.ts` feeding hallucinating fake LLM outputs → all rejected/replaced.
+- [ ] **T07 `apps/api` core** — Hono server: `/health`, passcode auth, `/v1/spots` CRUD, conditions, sightings, invitations list/get/respond, visits arrive/detections/observations/end, notes + search, preferences, `/cron/pull`, `/cron/forecast-ingest`, push subscribe. Deps: T02, T03.
+  Checks: route tests with `app.request()` on PGlite; `/cron/pull` integration test with fixture-backed fetch.
+- [ ] **T08 `ml/tabpfn`** — `export_ebird.py` (cache, 1 req/s), `features.py`, `train_eval.py` (TabPFN vs hotspot×hour avg, logistic regression, XGBoost; time split; AUC/Brier/precision@threshold → `evaluation/tabpfn_results.md`), `forecast_job.py`. Deps: T02 (schema).
+  Checks: pytest on features + labelling with a small synthetic fixture; scripts run end-to-end on fixture data. Real run needs `EBIRD_API_KEY`.
+
+## Wave 3 — Loop (parallel, after Wave 2)
+
+- [ ] **T09 `workflows/`** — Temporal `UserDayWorkflow`, `InvitationWorkflow`, signals/queries, activities wired to db/policy/agent/delivery; worker entry `pnpm worker`. Deps: T04, T06, T07.
+  Checks: time-skipping tests: accept→arrive→end→completed; decline; no-answer; missed; recheck-cancel; deterministic IDs prevent duplicates; worker restart resumes without duplicate delivery.
+- [ ] **T10 Delivery + voice** — Web Push (VAPID), ElevenLabs outbound call client, custom-LLM SSE endpoint `/v1/voice/llm/chat/completions`, post-call webhook with HMAC verification. Deps: T06, T07.
+  Checks: SSE endpoint returns valid OpenAI chunks (test); webhook rejects bad signature; call failure falls back to push.
+- [ ] **T11 `apps/web`** — Next.js PWA: passcode sign-in, Spots page (Leaflet map), settings (quiet hours, loves), invitations history with factor breakdown, notes + search, `/call/[id]`, service worker for push, manifest. Deps: T07.
+  Checks: `next build` passes; Playwright smoke: sign in → add spot → see it listed.
+- [ ] **T12 Visit page + BirdNET** — `/visit/[id]`: arrive, wake lock, pocket overlay with 2-s hold exit, mic capture, Web Worker running BirdNET TF.js (or documented honest fallback), regional filter, dedupe, IndexedDB outbox, observations, end + rating. Deps: T11.
+  Checks: unit tests for dedupe/outbox/filter; build passes; manual terrace test.
+
+## Wave 4 — Depth
+
+- [ ] **T13 Memory** — preference extraction from `intent` with quoted utterance → `preferences`; policy reads `spot_weekends_only` / `avoid_*`; nightly reflect: threshold nudge ±0.05, per-hour accept factors. Deps: T09.
+- [ ] **T14 Observability** — Sentry in api/web/workflows with spans + attributes (§17.4); no-op without DSN. Deps: T09–T11.
+- [ ] **T15 Scheduling + MCP** — `.github/workflows/cron.yml`; read-only `/mcp` tools. Deps: T07.
+- [ ] **T16 Evaluation** — retrieval eval (40 Qs: BM25 vs vector vs hybrid), agent eval (40 scripted turns), durability (20 kills) → `evaluation/*.md`. Deps: T09, T06, T02.
+- [ ] **T17 (P2) Fine-tune** — `ml/finetune` dataset builder + verifier + Kaggle notebook + eval. Deps: T06.
+
+## Wave 5 — Ship
+
+- [ ] **T18 Deploy** — web to Vercel; API target decided (Vercel / Render); worker host; env set; cron live.
+- [ ] **T19 Docs** — README, architecture image, `docs/field-notes.md`, demo account.
