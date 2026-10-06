@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { createBirdnet, type Birdnet } from "@/lib/birdnet/client";
 
 const BASE = "/birdnet/";
@@ -46,6 +47,8 @@ export function useBirdnet(coords: { lat: number; lon: number } | null | undefin
   useEffect(() => {
     const ac = new AbortController();
     let b: Birdnet | null = null;
+    // Model load (download + worker boot); ended once ready/failed. Never sent when Sentry is off.
+    const span = Sentry.startInactiveSpan({ name: "birdnet model load", op: "birdnet.load", forceTransaction: true });
     (async () => {
       try {
         await warmCache((progress) => setModel({ phase: "downloading", progress }), ac.signal);
@@ -60,9 +63,14 @@ export function useBirdnet(coords: { lat: number; lon: number } | null | undefin
         await b.ready;
         if (ac.signal.aborted) return;
         bn.current = b;
+        span.setAttribute("backend", b.backend);
+        span.end();
         setModel({ phase: "ready", backend: b.backend });
       } catch (e) {
-        if (!ac.signal.aborted) setModel({ phase: "failed", message: (e as Error).message });
+        if (ac.signal.aborted) return;
+        span.setStatus({ code: 2, message: "internal_error" });
+        span.end();
+        setModel({ phase: "failed", message: (e as Error).message });
       }
     })();
     return () => {

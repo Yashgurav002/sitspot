@@ -1,6 +1,7 @@
 "use client";
 // /visit/[id] — pocket mode (spec §14). Audio is analysed on the phone and dropped; only species JSON leaves it.
 import { useCallback, useEffect, useRef, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 import { api, ApiError } from "@/lib/api";
 import { time } from "@/lib/format";
 import { dedupeDetections, type DedupeState } from "@/lib/birdnet/dedupe";
@@ -77,6 +78,7 @@ export function VisitApp({ invitationId }: { invitationId: string }) {
   const dedupe = useRef<DedupeState>(new Map());
   const gate = useRef(createDropGate());
   const mic = useRef<Mic | null>(null);
+  const analyzeMs = useRef<number[]>([]); // per-window inference times, reported as an aggregate at visit end
   useEffect(() => {
     sessionRef.current = session;
     canAnalyze.current = model.phase === "ready" && regional !== "pending";
@@ -106,7 +108,12 @@ export function VisitApp({ invitationId }: { invitationId: string }) {
     flushing.current = true;
     try {
       const box = await outbox();
-      await flushOutbox(box, api.detections);
+      // Batch size and outcome only; the rows themselves (species) never go to Sentry.
+      await Sentry.startSpan({ name: "outbox flush", op: "outbox.flush" }, async (span) => {
+        const r = await flushOutbox(box, api.detections);
+        span.setAttributes({ sent: r.sent, dropped: r.dropped, status: r.pending ? "pending" : "drained" });
+        if (r.pending) span.setStatus({ code: 2, message: "unavailable" });
+      });
       setUnsynced((await box.peekBatch(200)).length);
     } finally {
       flushing.current = false;
@@ -178,6 +185,7 @@ export function VisitApp({ invitationId }: { invitationId: string }) {
         const t = Date.now();
         const ms = Math.round(performance.now() - t0);
         setStats((x) => ({ ...x, analysed: x.analysed + 1, lastMs: ms }));
+        analyzeMs.current.push(ms);
         if (preds.length === 0) return;
         const hits = preds.map((p) => ({ ...p, time: t }));
         heardRef.current = [...heardRef.current, ...hits];
@@ -296,6 +304,21 @@ export function VisitApp({ invitationId }: { invitationId: string }) {
         `[sitspot] visit ${session.visit_id} ended: ${mins.toFixed(1)} min, ${species} species, ` +
           `${stats.analysed} windows analysed, ${stats.skipped} skipped, last ${stats.lastMs} ms/window. ${battery}`,
       );
+      const ms = analyzeMs.current;
+      Sentry.startSpan(
+        {
+          name: "birdnet analyze windows",
+          op: "birdnet.analyze",
+          attributes: {
+            count: ms.length,
+            mean_ms: ms.length ? Math.round(ms.reduce((a, b) => a + b, 0) / ms.length) : 0,
+            max_ms: ms.length ? Math.max(...ms) : 0,
+            skipped: stats.skipped,
+          },
+        },
+        () => {},
+      );
+      analyzeMs.current = [];
       try {
         sessionStorage.removeItem(key(invitationId));
       } catch {}

@@ -11,6 +11,7 @@
     "e2e": "playwright test"
   },
   "dependencies": {
+    "@sentry/nextjs": "^11.4.0",
     "@sitspot/shared": "workspace:*",
     "@tensorflow/tfjs": "^4.22.0",
     "@tensorflow/tfjs-backend-wasm": "4.22.0",

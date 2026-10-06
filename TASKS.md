@@ -73,7 +73,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 ## Wave 4 — Depth
 
 - [x] **T13 Memory** — preference extraction from `intent` with quoted utterance → `preferences`; policy reads `spot_weekends_only` / `avoid_*`; nightly reflect: threshold nudge ±0.05, per-hour accept factors. Deps: T09.
-- [~] **T14 Observability** — Sentry in api/web/workflows with spans + attributes (§17.4); no-op without DSN. Deps: T09–T11.
+- [x] **T14 Observability** — Sentry in api/web/workflows with spans + attributes (§17.4); no-op without DSN. Deps: T09–T11.
 - [x] **T15 Scheduling + MCP** — `.github/workflows/cron.yml`; read-only `/mcp` tools. Deps: T07.
 - [x] **T16 Evaluation** — retrieval eval (40 Qs: BM25 vs vector vs hybrid), agent eval (40 scripted turns), durability (20 kills) → `evaluation/*.md`. Deps: T09, T06, T02.
 - [ ] **T17 (P2) Fine-tune** — `ml/finetune` dataset builder + verifier + Kaggle notebook + eval. Deps: T06.

@@ -117,7 +117,7 @@ export function createApp(deps: AppDeps) {
   app.use("*", cors({
     origin: env.WEB_ORIGIN || "http://localhost:3000",
     credentials: true,
-    allowHeaders: ["content-type", "authorization"],
+    allowHeaders: ["content-type", "authorization", "sentry-trace", "baggage"],
     allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   }));
 
