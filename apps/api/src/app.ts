@@ -147,7 +147,7 @@ export function createApp(deps: AppDeps) {
     httpOnly: true,
     path: "/",
     sameSite: crossSite ? ("None" as const) : ("Lax" as const),
-    secure: crossSite || new URL(c.req.url).protocol === "https:" || c.req.header("x-forwarded-proto") === "https",
+    secure: crossSite || new URL(c.req.url).protocol === "https:" || c.req.header("x-forwarded-proto")?.split(",")[0]?.trim() === "https",
   });
   const startSession = (c: Context, uid: string, demo: boolean) => {
     setCookie(c, SESSION_COOKIE, sign({ typ: "session", uid, demo, exp: now().getTime() + SESSION_MS }, secret), {

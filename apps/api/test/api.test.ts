@@ -90,6 +90,11 @@ describe("health + auth", () => {
     expect(out.res.headers.get("set-cookie")).toMatch(/Max-Age=0/i);
   });
 
+  it("cookie is Secure behind chained proxies (x-forwarded-proto 'https, https')", async () => {
+    const { res } = await req("/auth/demo", { method: "POST", headers: { "x-forwarded-proto": "https, https" } });
+    expect(res.headers.get("set-cookie")).toMatch(/Secure/);
+  });
+
   it("CORS echoes web origin with credentials; COOKIE_CROSS_SITE=1 gives SameSite=None; Secure", async () => {
     const pre = await app.request("/v1/spots", { method: "OPTIONS", headers: {
       origin: "http://localhost:3000", "access-control-request-method": "PATCH", "access-control-request-headers": "content-type" } });
