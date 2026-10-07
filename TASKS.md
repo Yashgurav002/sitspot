@@ -10,7 +10,9 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 - T16 done (`evaluation/`) + eval fix-up done: coast-after-dark enforced in agent (unsafe advice 12.5% → 2.5%), confidence bands enforced (right band 43% → 88%), past-low-tide check, LLM activity timeout 10 min.
 - TabPFN real run DONE (19,588 rows, 2022–2026): `evaluation/tabpfn_results.md` — AUC 0.649 ≈ baseline 0.650 (target missed), best precision@0.35 (0.627). Training data at `ml/tabpfn/training.csv` (gitignored: eBird data terms) — the laptop's hourly `forecast_job.py --api` uses it.
 
-**Next up:** repo pushed to https://github.com/Yashgurav002/sitspot (public) → Vercel import (Root Directory `apps/web`, env per docs/setup.md §11). T18 in progress — decided: everything on the laptop + one HTTPS tunnel (ngrok static domain recommended) to the Next app, which proxies `/api/*` to the API (same origin, no cross-site cookies); DB stays PGlite; TabPFN forecast job talks to the API (`--api`) instead of Postgres; `pnpm start` runs Temporal + API + web + local hourly cron. T19 first-pass docs done (README, docs/). T17 fine-tune optional.
+**Deployed (2026-10-07):** https://sitspot.vercel.app (web, Vercel, auto-deploys from `main`) → `/api` proxy → ngrok `ranger-pasted-kissable.ngrok-free.dev` → laptop `pnpm start --tunnel --no-web` (Temporal + API + hourly pull/forecast). Repo: https://github.com/Yashgurav002/sitspot (CI green). Verified: login (Secure cookie), 4 real spots, live pull + 166 eBird sightings, **push notification received on the phone** (Settings → Send test notification). After any API change: restart the laptop side (`q`, then the start command).
+
+**Next up:** (1) ElevenLabs + Twilio real call (steps in `apps/api/src/voice/README.md`; URLs use the ngrok domain); (2) first real visit → BirdNET + battery on the phone; (3) real visits Thu–Sat + footage + `docs/field-notes.md`; (4) README deploy links, demo video, DEV post. T17 fine-tune optional.
 
 **Waiting on the user:**
 - Twilio trial: verify +91 number, check Voice → Geo permissions allows India.
@@ -78,5 +80,5 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 
 ## Wave 5 — Ship
 
-- [~] **T18 Deploy** — web to Vercel; API target decided (Vercel / Render); worker host; env set; cron live.
+- [x] **T18 Deploy** — web to Vercel; API target decided (Vercel / Render); worker host; env set; cron live.
 - [x] **T19 Docs** — README, architecture image, `docs/field-notes.md`, demo account.
