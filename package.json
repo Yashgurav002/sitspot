@@ -10,7 +10,7 @@
     "start": "node scripts/start.mjs",
     "dev": "pnpm -r --parallel --filter ./apps/* dev",
     "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test && vitest run --root tests --passWithNoTests",
+    "test": "pnpm -r test",
     "worker": "pnpm --filter @sitspot/workflows worker"
   },
   "devDependencies": {
