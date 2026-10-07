@@ -137,6 +137,9 @@ function Push() {
       <button className="btn-ghost w-full" disabled={busy} onClick={() => void run(enable, "Notifications on.")}>
         Enable notifications
       </button>
+      <button className="btn-ghost w-full" disabled={busy} onClick={() => void run(() => api.testPush(), "Test sent. It should arrive in a few seconds.")}>
+        Send test notification
+      </button>
       {status}
     </section>
   );

@@ -18,7 +18,7 @@ import { pullAll } from "./services/pull";
 import { mcpHandler } from "./mcp";
 import { llmFromEnv, type Llm } from "@sitspot/llm";
 import { voicePublic, voiceSession, type VoiceDeps } from "./voice";
-import type { PushSender } from "./delivery";
+import { sendPush, type PushSender } from "./delivery";
 import { honoSentry } from "./observability";
 
 export type Signals = {
@@ -446,6 +446,14 @@ export function createApp(deps: AppDeps) {
   });
 
   app.get("/v1/push/vapid-public-key", (c) => c.json({ key: env.VAPID_PUBLIC_KEY || null }));
+
+  // Lets the user confirm push reaches their phone before a real invitation depends on it.
+  app.post("/v1/push/test", async (c) => {
+    const msg = { title: "Sitspot", body: "Test notification: push works. Your places can reach you.", url: "/" };
+    const sent = await sendPush(db, env, c.var.uid, msg, deps.push);
+    if (!sent) throw new HTTPException(409, { message: "No push subscription saved (or VAPID keys missing). Tap Enable notifications first." });
+    return c.json({ sent });
+  });
 
   // ---------- mcp (read-only) ----------
   app.all("/mcp", mcpHandler({ db, env, now, secret, sessionCookie: SESSION_COOKIE, adminEmail: adminEmail(env), embed: deps.embed }));

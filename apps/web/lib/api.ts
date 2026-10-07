@@ -104,4 +104,5 @@ export const api = {
 
   vapidKey: () => request<{ key: string }>("/v1/push/vapid-public-key"),
   subscribePush: (sub: PushSubscriptionJSON) => request<unknown>("/v1/push/subscribe", { method: "POST", json: sub }),
+  testPush: () => request<{ sent: boolean }>("/v1/push/test", { method: "POST" }),
 };
