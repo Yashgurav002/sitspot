@@ -68,7 +68,7 @@ export const api = {
   demo: () => request<unknown>("/auth/demo", { method: "POST" }),
   logout: () => request<unknown>("/auth/logout", { method: "POST" }),
   me: () => request<Me>("/v1/me"),
-  updateMe: (p: { quiet_start: string; quiet_end: string; threshold?: number }) =>
+  updateMe: (p: { quiet_start?: string; quiet_end?: string; threshold?: number }) =>
     request<unknown>("/v1/me", { method: "PATCH", json: p }),
 
   spots: () => request<WSpot[]>("/v1/spots"),

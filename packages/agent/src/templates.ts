@@ -1,6 +1,6 @@
 // Deterministic fallbacks. Built from the same formatters as the context block, so they
 // always pass the validators (tested).
-import { type DayFacts, type InvitationFacts, coastalClosed, confidenceWord, fmtAqi, fmtTemp, fmtTideM, fmtTime, nextWindow, upcomingLow, visitMinutes } from './facts.js';
+import { type DayFacts, type InvitationFacts, airLine, coastalClosed, poorAir, confidenceWord, fmtAqi, fmtTemp, fmtTideM, fmtTime, nextWindow, upcomingLow, visitMinutes } from './facts.js';
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const plural = (name: string, n: number) => (n === 1 ? name : `${name}s`);
@@ -17,7 +17,7 @@ function reasons(f: InvitationFacts): string[] {
   if (top) out.push(`${top.count} ${plural(top.common_name, top.count)} ${top.count === 1 ? 'was' : 'were'} reported nearby`);
   const n = f.numbers;
   if (n.apparent_c !== undefined) out.push(`it feels like ${fmtTemp(n.apparent_c)}${n.us_aqi !== undefined ? ` with ${fmtAqi(n.us_aqi)}` : ''}`);
-  else if (n.us_aqi !== undefined) out.push(`the air is clean, ${fmtAqi(n.us_aqi)}`);
+  else if (n.us_aqi !== undefined && !poorAir(f)) out.push(`the air is clean, ${fmtAqi(n.us_aqi)}`);
   if (n.golden_start && f.factors.light_bonus > 1) out.push(`golden hour starts at ${fmtTime(n.golden_start)}`);
   return out.slice(0, 3);
 }
@@ -38,6 +38,7 @@ export function templateScript(f: InvitationFacts): { script: string; reason: st
     `${f.spot.name} looks good right now.`,
     r.length ? `${cap(list(r))}.` : '',
     `Leave by ${fmtTime(f.leave_by)}, it's about ${f.spot.travel_min} ${plural('minute', f.spot.travel_min)} away, and it stays good until ${fmtTime(f.window_end)}.`,
+    poorAir(f) ? airLine(f.numbers.us_aqi!) : '',
     f.spot.kind === 'coastal' ? 'Stay on firm ground.' : '',
     'Want to go?',
   ];

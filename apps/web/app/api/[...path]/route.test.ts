@@ -42,3 +42,11 @@ it("502 when the API is unreachable", async () => {
   const { GET } = await import("./route");
   expect((await GET(new Request("http://web.example/api/health"))).status).toBe(502);
 });
+
+it("503 with a plain message when the tunnel reports the laptop offline", async () => {
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("<html>offline</html>", { status: 404, headers: { "ngrok-error-code": "ERR_NGROK_3200" } })));
+  const { GET } = await import("./route");
+  const res = await GET(new Request("http://web.example/api/health"));
+  expect(res.status).toBe(503);
+  expect((await res.json()).error).toMatch(/offline/);
+});

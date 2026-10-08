@@ -249,3 +249,18 @@ describe('writeNote', () => {
     expect(r.body).toBe(templateNote(visitDay));
   });
 });
+
+describe('poor air (US AQI 150–199) must be said in the script', () => {
+  it('template says it; a model script that omits it is rejected', async () => {
+    const { templateScript, checkScript } = await import('../src/index.js');
+    const base = (await import('./fixtures.js')).creek;
+    const f = { ...base, numbers: { ...base.numbers, us_aqi: 156 } };
+    const t = templateScript(f);
+    expect(t.script).toContain('The air is poor (US AQI 156), so keep it short and easy.');
+    expect(checkScript(t, f)).toEqual([]);
+    const silent = { script: t.script.replace('The air is poor (US AQI 156), so keep it short and easy. ', ''), reason: t.reason };
+    expect(checkScript(silent, f).some((p) => p.includes('AQI 156 is poor'))).toBe(true);
+    const clean = { ...base, numbers: { ...base.numbers, us_aqi: 62 } };
+    expect(templateScript(clean).script).not.toContain('air is poor');
+  });
+});

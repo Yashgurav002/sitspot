@@ -82,6 +82,11 @@ export function confidenceWord(c: number): string {
 export const COAST_CLOSE_BEFORE_SUNSET_MIN = 30;
 
 /** S-1: coastal spot and `at` (default now) is ≥ sunset − 30 min or before sunrise. Unknown sunset → open (policy is the gate). */
+/** US AQI 150–199: still invitable (S-4 blocks ≥ 200) but "Unhealthy" — the call must say so. */
+export const POOR_AIR_AQI = 150;
+export const poorAir = (f: Pick<InvitationFacts, 'numbers'>): boolean => f.numbers.us_aqi !== undefined && f.numbers.us_aqi >= POOR_AIR_AQI;
+export const airLine = (aqi: number) => `The air is poor (${fmtAqi(aqi)}), so keep it short and easy.`;
+
 export function coastalClosed(f: Pick<InvitationFacts, 'now' | 'spot' | 'numbers'>, at: Date = f.now): boolean {
   const { sunset, sunrise } = f.numbers;
   if (f.spot.kind !== 'coastal' || !sunset) return false;

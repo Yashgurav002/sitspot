@@ -4,7 +4,7 @@
 import type { Llm, Message, Usage } from '@sitspot/llm';
 import { z } from 'zod';
 import { buildContextBlock, renderDayFacts } from './context.js';
-import { type DayFacts, type InvitationFacts, coastalClosed, fmtTime } from './facts.js';
+import { type DayFacts, type InvitationFacts, coastalClosed, fmtTime, airLine, poorAir } from './facts.js';
 import { CHAT_INSTRUCTIONS, INTENT_INSTRUCTIONS, NOTE_INSTRUCTIONS, SCRIPT_INSTRUCTIONS, SYSTEM_PROMPT, feedback } from './prompts.js';
 import { templateChat, templateNote, templateScript } from './templates.js';
 import {
@@ -75,6 +75,9 @@ export function checkScript(out: { script: string; reason: string }, facts: Invi
     ...speciesInFacts(out.script, allowed),
     ...hasSafetyLine(out.script, facts.spot.kind),
     ...coastalClosedProblems(out.script, facts),
+    ...(poorAir(facts) && !(/\bair\b/i.test(out.script) && /\b(short|easy|gentle)\b/i.test(out.script))
+      ? [`AQI ${Math.round(facts.numbers.us_aqi!)} is poor: the script must say "${airLine(facts.numbers.us_aqi!)}"`]
+      : []),
     ...pastLowTide(out.script, facts),
     ...pastLowTide(out.reason, facts).map((p) => `reason: ${p}`),
     ...(mentionsTime(out.script, facts.leave_by) ? [] : [`script must say when to leave: "leave by ${fmtTime(facts.leave_by)}"`]),

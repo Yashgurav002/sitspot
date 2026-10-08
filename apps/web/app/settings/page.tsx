@@ -18,6 +18,7 @@ export default function SettingsPage() {
       {me.demo && <p className="card mb-4 text-sm text-muted">You&apos;re viewing the read-only demo. Changes won&apos;t save.</p>}
       <div className="space-y-6">
         <QuietHours start={me.user.quiet_start.slice(0, 5)} end={me.user.quiet_end.slice(0, 5)} />
+        <Pickiness initial={me.user.threshold} />
         <Loves initial={typeof loves?.value === "string" ? loves.value : (loves?.source_utterance ?? "")} />
         <Push />
         <SignOut />
@@ -79,6 +80,37 @@ function QuietHours({ start: s0, end: e0 }: { start: string; end: string }) {
       </div>
       <button className="btn w-full" disabled={busy}>
         Save quiet hours
+      </button>
+      {status}
+    </form>
+  );
+}
+
+function Pickiness({ initial }: { initial: number }) {
+  const [t, setT] = useState(initial);
+  const { busy, run, status } = useSave();
+  return (
+    <form
+      className="card space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void run(() => api.updateMe({ threshold: t }), "Saved. Sitspot also nudges this nightly from what you accept.");
+      }}
+    >
+      <h2 className="font-semibold">How picky?</h2>
+      <p className="text-sm text-muted">
+        Lower = more invitations on so-so days. Safety rules (heat, AQI 200+, coast after dark, high tide) always apply.
+      </p>
+      <label htmlFor="th" className="label">
+        Invite when the score is at least {t.toFixed(2)}
+      </label>
+      <input id="th" type="range" min={0.2} max={0.6} step={0.01} value={t} onChange={(e) => setT(Number(e.target.value))} className="w-full" />
+      <div className="flex justify-between text-xs text-muted">
+        <span>More invites</span>
+        <span>Fewer, better invites</span>
+      </div>
+      <button className="btn w-full" disabled={busy}>
+        Save
       </button>
       {status}
     </form>

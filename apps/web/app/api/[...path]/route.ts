@@ -44,6 +44,12 @@ async function proxy(req: Request): Promise<Response> {
     console.error("[api proxy]", req.method, url.pathname, (e as Error).message, (e as Error).cause ?? "");
     return Response.json({ error: "Sitspot API is unreachable (is the laptop on?)" }, { status: 502 });
   }
+  // The tunnel answers for an offline laptop with its own error page (ngrok-error-code header,
+  // e.g. ERR_NGROK_3200); say what actually happened instead of passing on a confusing 404.
+  if (res.headers.get("ngrok-error-code")) {
+    await res.body?.cancel();
+    return Response.json({ error: "Sitspot's home server is offline right now (the laptop is asleep or stopped). Try again later." }, { status: 503 });
+  }
   const out = new Headers(res.headers); // keeps every Set-Cookie
   for (const k of RES_DROP) out.delete(k); // fetch already decoded the body
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers: out });

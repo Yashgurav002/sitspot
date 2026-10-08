@@ -1,5 +1,5 @@
 // The context block (spec §9.2). The model sees only this; validators check against it.
-import { type DayFacts, type InvitationFacts, type Numbers, COAST_CLOSE_BEFORE_SUNSET_MIN, coastalClosed, confidenceWord, dayLabel, fmtAqi, fmtDate, fmtTemp, fmtTideM, fmtTime, fmtWind, visitMinutes } from './facts.js';
+import { type DayFacts, type InvitationFacts, type Numbers, COAST_CLOSE_BEFORE_SUNSET_MIN, airLine, coastalClosed, poorAir, confidenceWord, dayLabel, fmtAqi, fmtDate, fmtTemp, fmtTideM, fmtTime, fmtWind, visitMinutes } from './facts.js';
 
 export const FIRM_GROUND = 'stay on firm ground';
 
@@ -54,7 +54,7 @@ export function buildContextBlock(f: InvitationFacts): string {
   lines.push(
     `PREFERENCES: ${f.preferences.map((p) => `${p.key} = ${fmtValue(p.value)}`).join('; ') || 'none'}`,
     `RELEVANT NOTES: ${f.notes.map((n) => `[${n.date}] "${n.excerpt}"`).join(' ') || 'none'}`,
-    `SAFETY: ${safetyText(f)}${closedText(f)}`,
+    `SAFETY: ${safetyText(f)}${closedText(f)}${poorAir(f) ? `; ${airLine(f.numbers.us_aqi!)} Say this.` : ''}`,
   );
   return lines.join('\n');
 }
