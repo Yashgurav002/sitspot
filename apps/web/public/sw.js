@@ -12,6 +12,12 @@ self.addEventListener("push", (event) => {
       body: data.body || "One of your places is calling.",
       icon: "/icon.svg",
       data: { url: data.url || "/" },
+      // As attention-grabbing as a web notification can be: long buzz, stays until acted on,
+      // re-alerts if a newer invitation replaces an older one. (Browsers can't play a ringtone.)
+      tag: "sitspot-invitation",
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [600, 250, 600, 250, 600, 250, 1200],
     }),
   );
 });

@@ -4,10 +4,15 @@ import { firstSentences } from "@sitspot/agent";
 import type { Db } from "@sitspot/db";
 import type { Invitation } from "@sitspot/shared";
 import { callConfigured, placeCall } from "./call";
+import { sign } from "../auth";
 import { sendPush, type PushSender } from "./push";
 import { withSpan } from "../observability";
 
-export { placeCall, callConfigured } from "./call";
+export { placeCall, callConfigured, registerCall, twilioDirect } from "./call";
+
+/** Twilio fetches the call's TwiML with this; valid 30 min (covers retries). */
+export const callToken = (invitationId: string, secret: string, now = Date.now()) =>
+  sign({ typ: "call", inv: invitationId, exp: now + 30 * 60_000 }, secret);
 export { sendPush, pushConfigured, type PushSender, type PushMessage } from "./push";
 
 export type DeliveryResult =
@@ -35,7 +40,8 @@ export function createDeliver({ db, env, fetch: f, push }: {
     let call_error: string | undefined;
     if (callConfigured(env)) {
       try {
-        return { channel: "call", ...(await placeCall(env, { to: env.MY_PHONE_E164!, invitationId: inv.id, script, fetch: f })) };
+        const token = env.VOICE_SHARED_SECRET ? callToken(inv.id, env.VOICE_SHARED_SECRET) : undefined;
+        return { channel: "call", ...(await placeCall(env, { to: env.MY_PHONE_E164!, invitationId: inv.id, script, fetch: f }, token)) };
       } catch (e) {
         call_error = (e as Error).message;
         console.warn(`[deliver] call failed for ${inv.id}, falling back to push: ${call_error}`);

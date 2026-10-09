@@ -8,7 +8,9 @@ export function safeEqual(a: string, b: string): boolean {
 
 export type SessionClaims = { typ: "session"; uid: string; demo: boolean; exp: number };
 export type VisitClaims = { typ: "visit"; vid: string; exp: number };
-type Claims = SessionClaims | VisitClaims;
+/** Lets Twilio fetch the TwiML for one invitation's call (Twilio-direct mode). */
+export type CallClaims = { typ: "call"; inv: string; exp: number };
+type Claims = SessionClaims | VisitClaims | CallClaims;
 
 const b64 = (s: string | Buffer) => Buffer.from(s).toString("base64url");
 

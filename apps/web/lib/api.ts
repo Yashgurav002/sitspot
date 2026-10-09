@@ -104,6 +104,8 @@ export const api = {
 
   vapidKey: () => request<{ key: string }>("/v1/push/vapid-public-key"),
   subscribePush: (sub: PushSubscriptionJSON) => request<unknown>("/v1/push/subscribe", { method: "POST", json: sub }),
+  voiceSession: (invitationId: string) =>
+    request<{ agent_id: string | null; signed_url: string | null; script: string | null }>(`/v1/voice/session/${invitationId}`),
   testInvitation: () => request<{ invitation_id: string }>("/v1/invitations/test", { method: "POST" }),
   testPush: () => request<{ sent: boolean }>("/v1/push/test", { method: "POST" }),
 };
