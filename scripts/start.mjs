@@ -25,7 +25,11 @@ const WEB_PORT = "3000";
 const API_INTERNAL_URL = process.env.API_INTERNAL_URL || `http://localhost:${API_PORT}`;
 const NGROK_DOMAIN = process.env.NGROK_DOMAIN || dotenv.NGROK_DOMAIN;
 const TEMPORAL_DB = process.env.TEMPORAL_DB || ".temporal/temporal.db";
-const TEMPORAL_BIN = process.env.TEMPORAL_BIN || join(process.env.LOCALAPPDATA ?? "", "Temp", "temporal-sdk-typescript-1.24.0.exe");
+// First existing of: $TEMPORAL_BIN, the CLI installed to %LOCALAPPDATA%	emporal, the SDK's copy in Temp (Windows may clean that one).
+const TEMPORAL_BIN =
+  process.env.TEMPORAL_BIN ||
+  [join(process.env.LOCALAPPDATA ?? "", "temporal", "temporal.exe"), join(process.env.LOCALAPPDATA ?? "", "Temp", "temporal-sdk-typescript-1.24.0.exe")].find((p) => existsSync(p)) ||
+  join(process.env.LOCALAPPDATA ?? "", "temporal", "temporal.exe");
 
 const children = new Map(); // name -> ChildProcess
 let stopping = false;

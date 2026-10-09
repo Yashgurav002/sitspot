@@ -25,7 +25,7 @@ Each task = one issue. `Deps` must be done first. Every task is **done only when
 - Tide from Open-Meteo is timing-only (no heights in scripts) — coarse open-coast model.
 - eBird district codes verified: IN-MH-PG, IN-MH-TH, IN-MH-MC, IN-MH-MS.
 - Dev DB = PGlite (`.pglite/`); prod = any Postgres with pgvector via `DATABASE_URL`.
-- Temporal worker runs inside the API process; local dev server: `"$LOCALAPPDATA/Temp/temporal-sdk-typescript-1.24.0.exe" server start-dev --db-filename .temporal/temporal.db` (UI :8233).
+- Temporal worker runs inside the API process; local dev server: `temporal server start-dev --db-filename .temporal/temporal.db` (CLI installed at `%LOCALAPPDATA%	emporal`; `pnpm start` finds it automatically)` (UI :8233).
 - Learned per-hour accept factors stored in `users.accept_factors` (not preferences — those must be the user's own words).
 - Credits needed in README/DEV post: TabPFN by Prior Labs; BirdNET (Kahl et al. 2021, CC BY-NC-SA 4.0).
 
