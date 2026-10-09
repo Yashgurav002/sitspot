@@ -37,6 +37,7 @@ export function voicePublic(d: VoiceDeps) {
     if (!safeEqual(got, want)) return c.json({ error: "unauthorized" }, 401);
     return chatCompletions(c, d);
   };
+  app.post("/llm", llm); // in case the server URL is used verbatim (no /chat/completions appended)
   app.post("/llm/chat/completions", llm);
   app.post("/llm/v1/chat/completions", llm); // in case the server URL is entered without /v1 and ElevenLabs appends it
   app.post("/webhooks/post-call", (c) => postCall(c, d));
