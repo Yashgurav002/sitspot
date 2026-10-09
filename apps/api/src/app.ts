@@ -40,6 +40,8 @@ export type AppDeps = {
   llm?: Llm;
   /** web-push sender override (tests). */
   push?: PushSender;
+  /** Starts an InvitationWorkflow right now (TEST invitations). Absent when Temporal isn't running. */
+  startTestInvitation?: (invitationId: string, windowEnd: Date) => Promise<string>;
   /** Temporal worker health for /health; "disabled" when Temporal isn't running. */
   temporalHealth?: () => Promise<string>;
 };
@@ -328,6 +330,22 @@ export function createApp(deps: AppDeps) {
     const names = new Map((await q.listSpots(db, c.var.uid)).map((s) => [s.id, s.name]));
     const named = <T extends { spot_id: string }>(x: T) => ({ ...x, spot_name: names.get(x.spot_id) ?? null });
     return c.json({ threshold: r.threshold, pick: r.pick && named(r.pick), candidates: r.candidates.map(named) });
+  });
+
+  // TEST invitation: the real pipeline (script → delivery → visit → note) right now, for the best
+  // window that passes every safety rule. Only the score threshold, daily cap and send time are skipped.
+  app.post("/v1/invitations/test", async (c) => {
+    if (!deps.startTestInvitation) throw new HTTPException(503, { message: "Workflows aren't running (start Temporal), so a test invitation can't be sent." });
+    const r = await evaluateForUser(db, c.var.uid, now());
+    const best = r.candidates.filter((x) => x.safe && x.blocked_by.length === 0).sort((a, b) => b.score - a.score)[0];
+    if (!best) throw new HTTPException(409, { message: "No window in the next 6 hours passes the safety rules (heat, AQI 200+, coast after dark, high tide, quiet hours). Tests never bypass those." });
+    const inv = await q.createInvitation(db, {
+      user_id: c.var.uid, spot_id: best.spot_id, window_start: best.window_start, window_end: best.window_end,
+      score: best.score, factors: best.factors, reason: `TEST · ${best.reason}`,
+    });
+    const workflowId = await deps.startTestInvitation(inv.id, best.window_end);
+    await q.setInvitationStatus(db, inv.id, inv.status, { workflow_id: workflowId });
+    return c.json({ invitation_id: inv.id, workflow_id: workflowId }, 201);
   });
 
   // ---------- invitations ----------

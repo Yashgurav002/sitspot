@@ -6,7 +6,7 @@ import { Client, Connection } from "@temporalio/client";
 import { NativeConnection, Worker } from "@temporalio/worker";
 import { createDb, migrate, type Db } from "@sitspot/db";
 import {
-  arrivedSignal, respondedSignal, TASK_QUEUE, UserDayWorkflow, visitEndedSignal, workflowsPath,
+  arrivedSignal, InvitationWorkflow, respondedSignal, TASK_QUEUE, UserDayWorkflow, visitEndedSignal, workflowsPath,
 } from "@sitspot/workflows";
 import { createActivities, type ActivityDeps, type Deliver } from "./activities";
 import { DEMO_EMAIL, type Signals } from "./app";
@@ -15,6 +15,8 @@ import { activityInterceptor, sentryEnabled } from "./observability";
 export type TemporalHandle = {
   /** Plug into createApp({ signals }). */
   signals: Required<Signals>;
+  /** Start an InvitationWorkflow now (TEST invitations); returns its workflow id. */
+  startTestInvitation(invitationId: string, windowEnd: Date): Promise<string>;
   /** For /health: "up" if the frontend answers. */
   health(): Promise<"up" | "down">;
   close(): Promise<void>;
@@ -76,6 +78,16 @@ export async function startTemporal(deps: TemporalDeps): Promise<TemporalHandle 
   };
 
   return {
+    async startTestInvitation(invitationId, windowEnd) {
+      const workflowId = `test-${invitationId}`;
+      // recheckWindow reads workflow_id to recognise a TEST, so it must be on the row before the workflow runs.
+      await db.query(`update invitations set workflow_id = $2 where id = $1`, [invitationId, workflowId]);
+      await client.workflow.start(InvitationWorkflow, {
+        taskQueue: TASK_QUEUE, workflowId,
+        args: [{ invitationId, sendAt: new Date().toISOString(), windowEnd: windowEnd.toISOString() }],
+      });
+      return workflowId;
+    },
     signals: {
       responded: (inv, accepted) => signalInv(inv, (h) => h.signal(respondedSignal, { accepted })),
       arrived: (inv, visitId) => signalInv(inv, (h) => h.signal(arrivedSignal, { visitId })),

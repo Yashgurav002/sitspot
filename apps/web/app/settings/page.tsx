@@ -172,6 +172,13 @@ function Push() {
       <button className="btn-ghost w-full" disabled={busy} onClick={() => void run(() => api.testPush(), "Test sent. It should arrive in a few seconds.")}>
         Send test notification
       </button>
+      <button
+        className="btn-ghost w-full"
+        disabled={busy}
+        onClick={() => void run(() => api.testInvitation(), "TEST invitation started. Gemma is writing the script; the notification arrives in ~1–2 min.")}
+      >
+        Send a TEST invitation now
+      </button>
       {status}
     </section>
   );

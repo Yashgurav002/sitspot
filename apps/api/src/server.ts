@@ -26,6 +26,7 @@ const app = createApp({
   db,
   env,
   signals: temporal?.signals,
+  startTestInvitation: temporal ? (id, end) => temporal.startTestInvitation(id, end) : undefined,
   temporalHealth: temporal ? () => temporal.health() : undefined,
   embed: async (text) => (await embedder.embed([text]))[0]!,
 });
