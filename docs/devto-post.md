@@ -27,7 +27,7 @@ The screen is the shortest part of it: ~3 minutes of setup, then a buzz, a tap, 
 - Live app: **https://sitspot.vercel.app**
 - Video (phone screen recording):
 
-{% youtube VIDEO_ID %}
+{% youtube BJddW_OH_ZY %}
 
 **Honest note on the video.** Vasai's air was *hazardous* for my whole build week — US AQI 200–299 most evenings, 35–39°C feels-like. Sitspot did exactly what it should and **refused to invite me anywhere**; even its "send a TEST invitation" button refuses when no window passes the safety rules. So the recording uses a **TEST invitation** (the real pipeline — Gemma script, push, voice, visit, field note — with only the score threshold skipped, never safety) for a clean-air test spot, recorded at home. You can see my real Vasai spots on the home screen marked *AQI 229 · very unhealthy*. In pocket mode it heard a **House Crow** (they're everywhere here) and a **Barn Owl — "possibly"** at 2:50 pm indoors, which is almost certainly a false detection. That "possibly" is the point: the app is designed to say how sure it is and never to invent a bird.
 
@@ -73,7 +73,7 @@ A pnpm monorepo: Next.js 16 PWA (`apps/web`), Hono API (`apps/api`), Temporal wo
 
 ## My Agent Session
 
-Built with Claude Code as my coding agent: it wrote the PRD, split it into 20 tasks, ran sub-agents in parallel per package, and every task had to pass its tests before commit. Session: AGENT_SESSION_LINK
+Built with Claude Code as my coding agent: it wrote the PRD, split it into 20 tasks, ran sub-agents in parallel per package, and every task had to pass its tests before commit. 
 
 ## Prize Categories
 
