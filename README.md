@@ -2,7 +2,11 @@
 
 > **Your places, calling you.**
 
-You add the 3–5 real places you could actually go: a creek, a fort, a beach, a terrace. Sitspot watches them every hour using open data (weather, air quality, tide, sun, recent eBird sightings). When one of them opens a genuinely good window, it **calls you**, or sends a voice push if it can't call. The call gives you the place, the reasons with real numbers, and when to leave. If you go, you tap "I'm here", put the phone in your pocket, and walk. In the evening it writes a short field note from what actually happened, and it learns from what you accepted and declined.
+You add the 3–5 real places you could actually go: a creek, a fort, a beach, a terrace. Sitspot watches them every hour using open data (weather, air quality, tide, sun, recent eBird sightings). When one of them opens a genuinely good window, your phone **buzzes**, and tapping it opens a voice conversation with Sitspot in the browser (ElevenLabs voice, Gemma brain). The call gives you the place, the reasons with real numbers, and when to leave. If you go, you tap "I'm here", put the phone in your pocket, and walk. In the evening it writes a short field note from what actually happened, and it learns from what you accepted and declined.
+
+**Live:** https://sitspot.vercel.app · **Write-up:** [docs/devto-post.md](docs/devto-post.md)
+
+> Phone calls: the ElevenLabs + Twilio path is implemented (`apps/api/src/delivery/call.ts`), but new Twilio **trial** accounts block streaming call audio to an AI agent, so the deployed app delivers by push + in-browser voice. It works on a paid Twilio account.
 
 Built for the Hacktoberfest Open-Source AI Challenge, Week 1 "Touch Grass". Docs: [architecture](docs/architecture.md) · [setup](docs/setup.md) · [field notes](docs/field-notes.md) · [PRD](PRD.md) · [tasks](TASKS.md)
 
